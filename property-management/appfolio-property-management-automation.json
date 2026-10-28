@@ -1,0 +1,838 @@
+{
+  "name": "AppFolio Property Management Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "appfolio-work-order",
+        "options": {}
+      },
+      "id": "3b9ecbe8-8ed7-4660-b366-750ade3ba2a8",
+      "name": "Work Order Received",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "or",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.description }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "flood"
+                  },
+                  {
+                    "leftValue": "={{ $json.body.description }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "no heat"
+                  },
+                  {
+                    "leftValue": "={{ $json.body.description }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "gas leak"
+                  },
+                  {
+                    "leftValue": "={{ $json.body.description }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "electrical hazard"
+                  },
+                  {
+                    "leftValue": "={{ $json.body.description }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "lockout"
+                  },
+                  {
+                    "leftValue": "={{ $json.body.description }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "active leak"
+                  },
+                  {
+                    "leftValue": "={{ $json.body.urgency }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "emergency"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "or",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.description }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "appliance failure"
+                  },
+                  {
+                    "leftValue": "={{ $json.body.description }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "plumbing issue"
+                  },
+                  {
+                    "leftValue": "={{ $json.body.description }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "hvac issue"
+                  },
+                  {
+                    "leftValue": "={{ $json.body.description }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "leak"
+                  },
+                  {
+                    "leftValue": "={{ $json.body.urgency }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "urgent"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Normal"
+        }
+      },
+      "id": "9976096c-7760-45ea-90b5-6653c07f10f4",
+      "name": "Classify Urgency",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        464,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "maintenance-emergency"
+        },
+        "text": "=🚨 EMERGENCY WORK ORDER\n\nWork Order: {{ $json.body.workOrderId }}\nTenant: {{ $json.body.tenantName }}\nProperty: {{ $json.body.propertyAddress }}\nIssue: {{ $json.body.description }}\nPhone: {{ $json.body.tenantPhone }}\n\n⏰ SLA: Respond within 15 minutes",
+        "otherOptions": {}
+      },
+      "id": "458db080-df0d-44a5-a8b7-5248feb082b8",
+      "name": "Emergency Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        688,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL (e.g., https://api.appfolio.com/v1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"workOrderId\": $(\"Work Order Received\").item.json.body.workOrderId, \"title\": \"EMERGENCY: \" + $(\"Work Order Received\").item.json.body.issueType, \"description\": $(\"Work Order Received\").item.json.body.description, \"assignee\": \"maintenance-coordinator\", \"priority\": \"emergency\", \"dueDate\": $now.plus({ minutes: 15 }).toISO(), \"status\": \"open\" } }}",
+        "options": {}
+      },
+      "id": "3445572b-8f4d-44c2-bc1d-d696d846eac0",
+      "name": "Create Emergency Task in AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        912,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "a078c685-c301-4939-8d93-37cfb6002edd",
+      "name": "Merge All Urgency Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1136,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "maintenance-urgent"
+        },
+        "text": "=⚠️ URGENT WORK ORDER\n\nWork Order: {{ $json.body.workOrderId }}\nTenant: {{ $json.body.tenantName }}\nProperty: {{ $json.body.propertyAddress }}\nIssue: {{ $json.body.description }}\n\n⏰ SLA: Respond within 4 business hours",
+        "otherOptions": {}
+      },
+      "id": "bccabe25-624d-4864-b18c-d7662ff4406b",
+      "name": "Urgent Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        688,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL (e.g., https://api.appfolio.com/v1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"workOrderId\": $(\"Work Order Received\").item.json.body.workOrderId, \"title\": \"URGENT: \" + $(\"Work Order Received\").item.json.body.issueType, \"description\": $(\"Work Order Received\").item.json.body.description, \"assignee\": \"maintenance-coordinator\", \"priority\": \"urgent\", \"dueDate\": $now.plus({ hours: 4 }).toISO(), \"status\": \"open\" } }}",
+        "options": {}
+      },
+      "id": "d5b94f05-3a53-42fa-b4f1-2e6ec7474620",
+      "name": "Create Urgent Task in AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        912,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL (e.g., https://api.appfolio.com/v1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"workOrderId\": $json.body.workOrderId, \"title\": $json.body.issueType, \"description\": $json.body.description, \"assignee\": \"maintenance-coordinator\", \"priority\": \"normal\", \"dueDate\": $now.plus({ days: 1 }).toISO(), \"status\": \"open\" } }}",
+        "options": {}
+      },
+      "id": "5081d6a0-feea-4ebf-9569-f87ea0046e7e",
+      "name": "Create Normal Task in AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        912,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $(\"Work Order Received\").item.json.body.tenantPhone }}",
+        "message": "=Hi {{ $(\"Work Order Received\").item.json.body.tenantName }}, we have received your maintenance request for {{ $(\"Work Order Received\").item.json.body.propertyAddress }}. Our maintenance team has been notified and will review it shortly. Work Order #{{ $(\"Work Order Received\").item.json.body.workOrderId }}",
+        "options": {}
+      },
+      "id": "147f611d-e89b-454f-bd7b-8abcb2d44dd9",
+      "name": "Send Tenant Acknowledgment SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "missed-call",
+        "options": {}
+      },
+      "id": "be20d473-0054-40eb-a4e6-c28140ef1da3",
+      "name": "Missed Call Received",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ \"<__PLACEHOLDER_VALUE__AppFolio API URL__>/tenants?phone=\" + $json.body.callerPhone }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "a51bd981-b669-4b42-9542-fec7bf98f08e",
+      "name": "Lookup Tenant in AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ \"<__PLACEHOLDER_VALUE__AppFolio API URL__>/work-orders?tenantId=\" + $json.tenantId + \"&status=open\" }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "3ec39fb0-6fba-4abb-964c-ccfe765bf310",
+      "name": "Check Open Work Orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        688,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL (e.g., https://api.appfolio.com/v1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"title\": \"Missed Call Follow-Up: \" + $(\"Lookup Tenant in AppFolio\").item.json.name, \"description\": \"Missed call from \" + $(\"Lookup Tenant in AppFolio\").item.json.name + \" at \" + $(\"Missed Call Received\").item.json.body.timestamp + \". Phone: \" + $(\"Lookup Tenant in AppFolio\").item.json.phone + \". Open work orders: \" + ($json.workOrders.length > 0 ? $json.workOrders[0].workOrderId : \"None\"), \"assignee\": \"maintenance-coordinator\", \"priority\": \"normal\", \"dueDate\": $now.plus({ hours: 2 }).toISO(), \"status\": \"open\", \"relatedWorkOrder\": $json.workOrders.length > 0 ? $json.workOrders[0].workOrderId : null } }}",
+        "options": {}
+      },
+      "id": "b9d25ccc-b84e-4d9b-8ee7-0b11f3e114ed",
+      "name": "Create Missed Call Follow-Up Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        912,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $(\"Lookup Tenant in AppFolio\").item.json.phone }}",
+        "message": "=Hi {{ $(\"Lookup Tenant in AppFolio\").item.json.name }}, we missed your call. A member of our team will follow up with you shortly. If this is regarding an urgent maintenance issue, please reply with details.",
+        "options": {}
+      },
+      "id": "f65c66e9-80c5-4224-a216-64d804ec3f60",
+      "name": "Send Missed Call SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "2bdffcc4-dfab-4b22-bd06-ce790e4c9883",
+      "name": "Check Tasks Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL (e.g., https://api.appfolio.com/v1/tasks?status=open&overdue=true)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "9f0fe223-abf1-4624-8c84-8362db6b81e4",
+      "name": "Fetch Overdue Tasks from AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "maintenance-escalation"
+        },
+        "text": "=🔴 OVERDUE TASK ESCALATION\n\nTask ID: {{ $json.taskId }}\nWork Order: {{ $json.workOrderId }}\nPriority: {{ $json.priority }}\nAssignee: {{ $json.assignee }}\nDue Date: {{ $json.dueDate }}\n\nThis task is overdue and requires immediate attention.",
+        "otherOptions": {}
+      },
+      "id": "fede52fe-d012-4561-8251-de92a3dd405e",
+      "name": "Escalate Overdue Tasks",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        688,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "work-order-status-update",
+        "options": {}
+      },
+      "id": "b9bc9a62-1883-4eca-a871-aded35f39125",
+      "name": "Work Order Status Changed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "statusMessage",
+              "type": "string",
+              "value": "={{ $json.body.status === \"assigned\" ? \"Your maintenance request has been assigned to \" + $json.body.assignedTo + \".\" : $json.body.status === \"scheduled\" ? \"Your maintenance appointment is scheduled for \" + $json.body.scheduledDate + \".\" : $json.body.status === \"in_progress\" ? \"Our technician is currently working on your maintenance request.\" : $json.body.status === \"completed\" ? \"Your maintenance request has been completed. Please let us know if you need anything else.\" : $json.body.status === \"delayed\" ? \"Your maintenance request has been delayed. We will update you with a new schedule soon.\" : \"Your maintenance request status has been updated.\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cd5b5f3e-baee-4936-9ce9-2145a8d72b6e",
+      "name": "Format Status Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        464,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $(\"Work Order Status Changed\").item.json.body.tenantPhone }}",
+        "message": "=Hi {{ $(\"Work Order Status Changed\").item.json.body.tenantName }}, {{ $json.statusMessage }} Work Order #{{ $(\"Work Order Status Changed\").item.json.body.workOrderId }}",
+        "options": {}
+      },
+      "id": "bcda174a-8680-49b5-80e1-e66197a1b3e5",
+      "name": "Send Status Update to Tenant",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        688,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lease-renewal",
+        "options": {}
+      },
+      "id": "d74e14a0-d85c-491e-833c-098cbb97569e",
+      "name": "Lease Renewal Initiated",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        1488
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL (e.g., https://api.appfolio.com/v1/checklists)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"leaseId\": $json.body.leaseId, \"title\": \"Lease Renewal: \" + $json.body.tenantName, \"assignee\": $json.body.assignedTo, \"dueDate\": $now.plus({ days: 30 }).toISO(), \"tasks\": [ { \"name\": \"Review current lease terms\", \"dueDate\": $now.plus({ days: 5 }).toISO(), \"status\": \"pending\" }, { \"name\": \"Prepare renewal offer\", \"dueDate\": $now.plus({ days: 10 }).toISO(), \"status\": \"pending\" }, { \"name\": \"Send renewal offer to tenant\", \"dueDate\": $now.plus({ days: 15 }).toISO(), \"status\": \"pending\" }, { \"name\": \"Follow up with tenant\", \"dueDate\": $now.plus({ days: 20 }).toISO(), \"status\": \"pending\" }, { \"name\": \"Finalize renewal agreement\", \"dueDate\": $now.plus({ days: 25 }).toISO(), \"status\": \"pending\" }, { \"name\": \"Update lease in AppFolio\", \"dueDate\": $now.plus({ days: 30 }).toISO(), \"status\": \"pending\" } ] } }}",
+        "options": {}
+      },
+      "id": "a1f850d6-6f40-4495-aea2-419130787fae",
+      "name": "Create Lease Renewal Checklist",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        1488
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "property-management"
+        },
+        "text": "=📋 NEW LEASE RENEWAL CHECKLIST\n\nTenant: {{ $(\"Lease Renewal Initiated\").item.json.body.tenantName }}\nProperty: {{ $(\"Lease Renewal Initiated\").item.json.body.propertyAddress }}\nCurrent Lease End: {{ $(\"Lease Renewal Initiated\").item.json.body.currentLeaseEnd }}\nRenewal Date: {{ $(\"Lease Renewal Initiated\").item.json.body.renewalDate }}\n\nA 6-step checklist has been created in AppFolio. Please review and complete tasks by their due dates.",
+        "otherOptions": {}
+      },
+      "id": "c78605cd-4a59-4329-8b3e-d8ad5cf2be75",
+      "name": "Notify Property Manager",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        688,
+        1488
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Work Order Automation\n\nThis workflow handles incoming work orders from AppFolio:\n1. Classifies urgency (Emergency/Urgent/Normal)\n2. Creates tasks with appropriate SLAs\n3. Sends tenant acknowledgment SMS\n\n**SLA Times:**\n- Emergency: 15 minutes\n- Urgent: 4 hours\n- Normal: 1 business day",
+        "height": 600,
+        "width": 1800,
+        "color": 2
+      },
+      "id": "866692a5-1e9c-4fc2-83ad-e66d38d47f36",
+      "name": "Sticky Note 2e5999aa",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Missed Call Follow-Up\n\nAutomatically creates follow-up tasks when tenants call:\n1. Looks up tenant in AppFolio\n2. Checks for open work orders\n3. Creates follow-up task\n4. Sends acknowledgment SMS",
+        "height": 200,
+        "width": 1500,
+        "color": 3
+      },
+      "id": "7381c56d-7d9d-49d2-a102-c5a4218dbdf4",
+      "name": "Sticky Note fe5ec0cf",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Task Follow-Up & Escalation\n\nRuns every hour to check for overdue tasks:\n- Fetches all overdue tasks from AppFolio\n- Escalates to Slack channel\n- Ensures accountability",
+        "height": 200,
+        "width": 900,
+        "color": 4
+      },
+      "id": "f66fcfd7-8b56-4fc4-9d01-0a58509817ef",
+      "name": "Sticky Note 78e171e3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        1360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Tenant Status Updates\n\nKeeps tenants informed at every stage:\n- Request received\n- Assigned to vendor\n- Scheduled\n- In progress\n- Completed\n- Delayed",
+        "height": 200,
+        "width": 900,
+        "color": 5
+      },
+      "id": "15f5bc64-23fb-4123-b6ad-d23c7d8830cc",
+      "name": "Sticky Note 75a60cb4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Admin Checklists\n\nAutomates recurring admin workflows:\n- Lease renewals (6-step process)\n- Lease addendums\n- Admin changes\n- Tenant removals\n\nEach checklist includes due dates and escalation.",
+        "height": 200,
+        "width": 900,
+        "color": 6
+      },
+      "id": "0fce0388-974c-43b1-956b-0726ecb88b8a",
+      "name": "Sticky Note 78758330",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        2160
+      ]
+    }
+  ],
+  "connections": {
+    "Work Order Received": {
+      "main": [
+        [
+          {
+            "node": "Classify Urgency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Urgency": {
+      "main": [
+        [
+          {
+            "node": "Emergency Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Urgent Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Normal Task in AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Emergency Alert": {
+      "main": [
+        [
+          {
+            "node": "Create Emergency Task in AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Emergency Task in AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Merge All Urgency Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Urgency Paths": {
+      "main": [
+        [
+          {
+            "node": "Send Tenant Acknowledgment SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Urgent Notification": {
+      "main": [
+        [
+          {
+            "node": "Create Urgent Task in AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Urgent Task in AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Merge All Urgency Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Missed Call Received": {
+      "main": [
+        [
+          {
+            "node": "Lookup Tenant in AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Tenant in AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Check Open Work Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Open Work Orders": {
+      "main": [
+        [
+          {
+            "node": "Create Missed Call Follow-Up Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Missed Call Follow-Up Task": {
+      "main": [
+        [
+          {
+            "node": "Send Missed Call SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Tasks Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Fetch Overdue Tasks from AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Overdue Tasks from AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Escalate Overdue Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Work Order Status Changed": {
+      "main": [
+        [
+          {
+            "node": "Format Status Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Status Message": {
+      "main": [
+        [
+          {
+            "node": "Send Status Update to Tenant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lease Renewal Initiated": {
+      "main": [
+        [
+          {
+            "node": "Create Lease Renewal Checklist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Lease Renewal Checklist": {
+      "main": [
+        [
+          {
+            "node": "Notify Property Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Normal Task in AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Merge All Urgency Paths",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

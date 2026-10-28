@@ -1,0 +1,374 @@
+{
+  "name": "Emergency Maintenance Escalation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "maintenance-request",
+        "options": {}
+      },
+      "id": "d8c52bec-d809-4211-a005-ba73df73a694",
+      "name": "Maintenance Request Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        96,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "ticketId",
+              "value": "={{ $json.body.ticketId }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "priority",
+              "value": "={{ $json.body.priority }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "category",
+              "value": "={{ $json.body.category }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "description",
+              "value": "={{ $json.body.description }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "propertyAddress",
+              "value": "={{ $json.body.propertyAddress }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "tenantName",
+              "value": "={{ $json.body.tenantName }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "tenantPhone",
+              "value": "={{ $json.body.tenantPhone }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "vendorAssigned",
+              "value": "={{ $json.body.vendorAssigned }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "vendorEmail",
+              "value": "={{ $json.body.vendorEmail }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1f479b92-e132-4168-b841-7d83462e8f27",
+      "name": "Extract Request Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        320,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.priority }}",
+                    "rightValue": "emergency",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Emergency"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.priority }}",
+                    "rightValue": "urgent",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Urgent"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.priority }}",
+                    "rightValue": "normal",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Normal"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Other"
+        }
+      },
+      "id": "4ddfad7f-7b77-49e7-8b1a-ea09e5f2a8e7",
+      "name": "Route by Priority",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        544,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "<__PLACEHOLDER_VALUE__emergency-maintenance__>"
+        },
+        "text": "=🚨 EMERGENCY MAINTENANCE REQUEST\n\nTicket: {{ $json.ticketId }}\nCategory: {{ $json.category }}\nProperty: {{ $json.propertyAddress }}\nTenant: {{ $json.tenantName }}\nDescription: {{ $json.description }}\n\nVendor Assigned: {{ $json.vendorAssigned }}\nVendor Email: {{ $json.vendorEmail }}",
+        "otherOptions": {}
+      },
+      "id": "94ea3559-5427-4734-8e1b-1475d5686c92",
+      "name": "Alert Slack - Emergency",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        768,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__+15559876543 (Your Twilio number)__>",
+        "to": "<__PLACEHOLDER_VALUE__+15551112222 (Property manager phone)__>",
+        "message": "=EMERGENCY: {{ $(\"Extract Request Data\").item.json.category }} at {{ $(\"Extract Request Data\").item.json.propertyAddress }}. Ticket {{ $(\"Extract Request Data\").item.json.ticketId }}. Vendor {{ $(\"Extract Request Data\").item.json.vendorAssigned }} assigned.",
+        "options": {}
+      },
+      "id": "ad4b2056-b123-4b6b-9936-d5a055a887b8",
+      "name": "Send SMS - Emergency",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        992,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "<__PLACEHOLDER_VALUE__maintenance@yourcompany.com__>",
+        "toEmail": "<__PLACEHOLDER_VALUE__manager@yourcompany.com__>",
+        "subject": "=Urgent Maintenance: {{ $json.ticketId }} - {{ $json.category }}",
+        "html": "=<h2>Urgent Maintenance Request</h2>\n<p><strong>Ticket ID:</strong> {{ $json.ticketId }}</p>\n<p><strong>Category:</strong> {{ $json.category }}</p>\n<p><strong>Property:</strong> {{ $json.propertyAddress }}</p>\n<p><strong>Tenant:</strong> {{ $json.tenantName }} ({{ $json.tenantPhone }})</p>\n<p><strong>Description:</strong> {{ $json.description }}</p>\n<hr>\n<p><strong>Vendor Assigned:</strong> {{ $json.vendorAssigned }}</p>\n<p><strong>Vendor Email:</strong> {{ $json.vendorEmail }}</p>",
+        "options": {}
+      },
+      "id": "c6e99e50-4ecf-4ddb-a232-c7453a3827b9",
+      "name": "Email - Urgent",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        768,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "<__PLACEHOLDER_VALUE__maintenance-log__>"
+        },
+        "text": "=📋 Maintenance Request Logged\n\nTicket: {{ $json.ticketId }}\nCategory: {{ $json.category }}\nProperty: {{ $json.propertyAddress }}\nVendor: {{ $json.vendorAssigned }}",
+        "otherOptions": {}
+      },
+      "id": "da63882b-a037-452d-b65b-29c8fbfae180",
+      "name": "Log to Slack - Normal",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        768,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "<__PLACEHOLDER_VALUE__maintenance@yourcompany.com__>",
+        "toEmail": "<__PLACEHOLDER_VALUE__manager@yourcompany.com__>",
+        "subject": "=Maintenance Request Needs Review: {{ $json.ticketId }}",
+        "html": "=<h2>Maintenance Request - Review Required</h2>\n<p>This request has an unrecognized priority level and needs manual review.</p>\n<p><strong>Ticket ID:</strong> {{ $json.ticketId }}</p>\n<p><strong>Priority:</strong> {{ $json.priority }}</p>\n<p><strong>Category:</strong> {{ $json.category }}</p>\n<p><strong>Property:</strong> {{ $json.propertyAddress }}</p>\n<p><strong>Description:</strong> {{ $json.description }}</p>",
+        "options": {}
+      },
+      "id": "58b2b2ae-62c9-4531-a18b-59c96b74aa4c",
+      "name": "Email - Review Required",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        544,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Emergency Maintenance Escalation\n\nThis workflow routes maintenance requests by priority:\n\n- **Emergency**: Slack alert + SMS to manager\n- **Urgent**: Email notification\n- **Normal**: Slack log only\n- **Other**: Email for manual review",
+        "height": 180,
+        "width": 680,
+        "color": 2
+      },
+      "id": "e797621e-5cde-4858-9e6a-0a69226a1a12",
+      "name": "Sticky Note a350b1a0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        208,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Setup Instructions\n\n1. Configure webhook URL in AppFolio\n2. Set Slack channel names\n3. Add SMTP credentials\n4. Add Twilio credentials for SMS\n5. Update email addresses and phone numbers",
+        "height": 200,
+        "width": 400,
+        "color": 4
+      },
+      "id": "7752ab30-29da-4032-b66a-2c861dc55328",
+      "name": "Sticky Note 2ec3e05b",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        64
+      ]
+    }
+  ],
+  "connections": {
+    "Maintenance Request Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Request Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Request Data": {
+      "main": [
+        [
+          {
+            "node": "Route by Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Priority": {
+      "main": [
+        [
+          {
+            "node": "Alert Slack - Emergency",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email - Urgent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log to Slack - Normal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email - Review Required",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Slack - Emergency": {
+      "main": [
+        [
+          {
+            "node": "Send SMS - Emergency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

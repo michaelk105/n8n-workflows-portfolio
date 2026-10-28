@@ -1,0 +1,643 @@
+{
+  "name": "Maintenance Request Auto-Triage (Claude) - Full with Fallbacks",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Work Orders"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.received_at || new Date().toISOString() }}",
+            "Tenant": "={{ $json.tenant_name }}",
+            "Unit": "={{ $json.unit_number }}",
+            "Category": "={{ $json.category || 'N/A' }}",
+            "Urgency": "={{ $json.urgency || 'unknown' }}",
+            "Status": "={{ $json.route || 'manual_review' }}",
+            "Summary": "={{ $json.summary || $json.manual_review_reason || 'See manual review' }}"
+          }
+        },
+        "options": {}
+      },
+      "name": "Log Work Order",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1088,
+        16
+      ],
+      "id": "3ae4a58e-4ff4-4611-9259-4655e1b64e54",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "pm@yourcompany.com",
+        "subject": "=New Work Order — {{ $json.category }} ({{ $json.urgency }})",
+        "message": "=Tenant: {{$json.tenant_name}} | Unit: {{$json.unit_number}}\n\nSummary: {{$json.summary}}\n\nOriginal message: {{$json.original_message}}",
+        "options": {}
+      },
+      "name": "Notify Property Manager",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1760,
+        -80
+      ],
+      "id": "0770343d-5b54-45c9-8241-0cda9249ad5d",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Fallback logic: anything uncertain (bad data, AI failure, unexpected response) routes here instead of disappearing. A person always sees it — and it still gets logged.",
+        "height": 140,
+        "width": 280,
+        "color": 3
+      },
+      "name": "Sticky Note - Fallbacks",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        112,
+        -288
+      ],
+      "id": "69e47939-0c31-4630-bfb9-a5dd5bc174f0"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nconst required = ['tenant_name', 'unit_number', 'contact', 'message'];\nconst missing = required.filter(field => !body[field] || String(body[field]).trim() === '');\n\nreturn [{\n  json: {\n    ...body,\n    valid: missing.length === 0,\n    error_reason: missing.length > 0 ? ('Missing required field(s): ' + missing.join(', ')) : null\n  }\n}];"
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        112
+      ],
+      "id": "f645c2dd-11ef-4853-a7b1-e05fa8561ed6"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF Valid Input?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        112
+      ],
+      "id": "c50b39ae-929a-4d51-9b96-53fad31b2c48"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=Thanks {{$json.tenant_name}}, we received your maintenance request and are reviewing it now.",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Respond - Acknowledged",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -32,
+        16
+      ],
+      "id": "415d62dc-73fc-4faf-9dc2-e92355d53509"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=Sorry, we couldn't process your request: {{$json.error_reason}}. Please resubmit with the missing info.",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "name": "Respond - Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -32,
+        208
+      ],
+      "id": "f11a0bcc-6e3f-4b5b-b1fb-3ae710640992"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "manual_review",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Manual Review"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "missing_info",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Missing Info"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "emergency",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Emergency"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "standard",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Standard"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Switch - Route By Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        640,
+        80
+      ],
+      "id": "73150ce2-1d8e-4212-818d-c7aeec7cafcd"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": "automation-alerts",
+        "text": "=⚠️ Logging failed for a maintenance request (Tenant: {{$json.tenant_name || 'unknown'}}). Check Google Sheets connection — this request still needs to be tracked manually.",
+        "otherOptions": {}
+      },
+      "name": "Alert Builder - Logging Failed",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1312,
+        112
+      ],
+      "id": "6a1d9e34-4bd4-4347-bff8-de282e6c1969"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "missing_info",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "manual_review",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF Send Tenant Ack?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        -80
+      ],
+      "id": "9bf75bd2-7355-4a2d-b325-8746f4a859bc"
+    },
+    {
+      "parameters": {
+        "content": "## 🔧 Maintenance Request Auto-Triage\nTenant submits → validated → Claude triages → routed (standard / emergency / missing info / manual review) → logged + notified.\n\nBuilt with retries, error handling, and a full audit trail — nothing silently fails.\n\nBuilt by [Your Name] — AI automation for small property management teams.",
+        "height": 220,
+        "width": 380,
+        "color": 4
+      },
+      "name": "Sticky Note - Overview1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        -336
+      ],
+      "id": "215a1aa9-303f-4ec0-a927-750afdc18cb6"
+    },
+    {
+      "parameters": {
+        "content": "Powered by Claude — reads the raw tenant message, returns structured triage data. Retries automatically on failure (up to 3x). If it still fails, routes to manual review instead of breaking.",
+        "width": 280,
+        "color": 6
+      },
+      "name": "Sticky Note - Claude1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        -304
+      ],
+      "id": "8f056a32-2f8c-411c-a2c3-250bd192ef7d"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "maintenance-request",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Maintenance Request Webhook1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        112
+      ],
+      "id": "2cb5a779-a80b-4fd8-a2eb-f8d4effe7478"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": "property-management-alerts",
+        "text": "=🚨 EMERGENCY maintenance request\nTenant: {{$json.tenant_name}} (Unit {{$json.unit_number}})\nCategory: {{$json.category}}\nSummary: {{$json.summary}}",
+        "otherOptions": {}
+      },
+      "name": "Alert PM - Emergency1",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        864,
+        176
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "id": "8cf1e804-18a0-41c9-8e89-f55c81aad101"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $credentials.anthropicApi.apiKey }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 500,\n  \"system\": \"You are a maintenance request triage assistant for a property management company. Read the tenant's message and respond with ONLY a JSON object (no other text) with these fields: urgency (one of: emergency, urgent, routine), category (plumbing, electrical, HVAC, appliance, structural, pest, other), missing_info (array of strings - empty array if nothing is missing), summary (one sentence summary for the property manager), tenant_reply_draft (a short, friendly acknowledgment message to send back to the tenant).\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Tenant: {{$json.tenant_name}}\\nUnit: {{$json.unit_number}}\\nMessage: {{$json.message}}\" }\n  ]\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "3667cbdc-75cd-4e53-bd00-d7bac8addda1",
+      "name": "Claude - Triage Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        192,
+        16
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allowedUrgency = ['emergency', 'urgent', 'routine'];\nconst trigger = $('Maintenance Request Webhook1').first().json;\nlet parsed;\n\ntry {\n  const raw = $input.first().json.content[0].text;\n  parsed = JSON.parse(raw);\n} catch (err) {\n  return [{\n    json: {\n      tenant_name: trigger.tenant_name,\n      unit_number: trigger.unit_number,\n      contact: trigger.contact,\n      original_message: trigger.message,\n      route: 'manual_review',\n      manual_review_reason: 'Could not parse Claude response',\n      received_at: new Date().toISOString()\n    }\n  }];\n}\n\nlet manualReviewReason = null;\nif (!allowedUrgency.includes(parsed.urgency)) {\n  parsed.urgency = 'routine';\n  manualReviewReason = 'Unexpected urgency value from Claude';\n}\n\nlet route = 'standard';\nif (parsed.missing_info && parsed.missing_info.length > 0) {\n  route = 'missing_info';\n} else if (parsed.urgency === 'emergency') {\n  route = 'emergency';\n}\n\nreturn [{\n  json: {\n    tenant_name: trigger.tenant_name,\n    unit_number: trigger.unit_number,\n    contact: trigger.contact,\n    original_message: trigger.message,\n    urgency: parsed.urgency,\n    category: parsed.category,\n    missing_info: parsed.missing_info || [],\n    summary: parsed.summary,\n    tenant_reply_draft: parsed.tenant_reply_draft,\n    route: route,\n    manual_review_reason: manualReviewReason,\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "8502f466-1604-4824-ad10-2591fcdbdbb4",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.contact }}",
+        "subject": "We've got your maintenance request",
+        "message": "={{ $json.tenant_reply_draft }}",
+        "options": {}
+      },
+      "id": "4426a3a4-62d5-457d-aeb9-12944859359b",
+      "name": "Send Tenant Acknowledgment",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1536,
+        -80
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Log Work Order": {
+      "main": [
+        [
+          {
+            "node": "IF Send Tenant Ack?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Builder - Logging Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "IF Valid Input?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Valid Input?": {
+      "main": [
+        [
+          {
+            "node": "Respond - Acknowledged",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond - Acknowledged": {
+      "main": [
+        [
+          {
+            "node": "Claude - Triage Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Route By Status": {
+      "main": [
+        [
+          {
+            "node": "Log Work Order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Work Order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert PM - Emergency1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Work Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Send Tenant Ack?": {
+      "main": [
+        [
+          {
+            "node": "Send Tenant Acknowledgment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Maintenance Request Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert PM - Emergency1": {
+      "main": [
+        [
+          {
+            "node": "Log Work Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - Triage Request": {
+      "main": [
+        [
+          {
+            "node": "Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Work Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "Switch - Route By Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Tenant Acknowledgment": {
+      "main": [
+        [
+          {
+            "node": "Notify Property Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

@@ -1,0 +1,3143 @@
+{
+  "name": "Property Management AI Assistant",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ac5e45be-4fc9-4b74-b2b3-502208e4f2bb",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an AI assistant for a property management company.\n\nYour job is to review incoming messages, leads, maintenance requests, tenant questions, and operational notes, then return a clear structured response.\n\nAlways classify the request into one of these categories:\n- Emergency Maintenance\n- Standard Maintenance\n- Leasing Inquiry\n- Tenant Communication\n- Rent / Payment Issue\n- Lease Renewal\n- Vendor / Scheduling\n- General Admin\n\nFor every request, provide:\n1. Summary: Briefly summarize what the person needs\n2. Priority: Choose one: Emergency, High, Medium, Low\n3. Recommended Action: Explain what the property management team should do next\n4. Suggested Reply: Write a professional SMS or email response\n5. Extracted Details: Extract all available information\n\nEMERGENCY RULES:\nIf the message mentions flooding, active leak, no heat in freezing weather, no AC in extreme heat, fire, gas smell, electrical hazard, lockout, sewage backup, or major safety issue, mark it as Emergency priority and recommend immediate escalation.\n\nTONE RULES:\n- Be professional, calm, helpful, and concise\n- Do not sound threatening\n- Do not make legal claims\n- Do not promise repairs are guaranteed at a specific time unless the information is provided\n- Do not invent missing information\n\nSMS RULES:\n- Set sms.send_sms to true ONLY if a valid phone number is available\n- If no phone number, set sms.send_sms to false and add \"phone\" to missing_fields\n- Keep SMS under 320 characters\n- SMS should only acknowledge, request missing info, or confirm next steps\n- Do not include legal, rent dispute, refund, lease change, or sensitive financial language in SMS\n\nEMAIL RULES:\n- Set email.send_email to true ONLY if a valid email address is available\n- If no email, set email.send_email to false and add \"email\" to missing_fields\n- Email should be used for longer explanations, owner updates, vendor coordination, and leasing follow-up\n\nMISSING INFORMATION RULES:\n- If any required field is missing, set missing_information to true\n- Set safe_to_continue_workflow to false\n- Add missing field names to missing_fields array\n- Set recommended_fallback to \"Send to human review or request missing information.\"\n\nHUMAN REVIEW REQUIRED FOR:\n- Emergency maintenance (always)\n- Legal language\n- Refund request\n- Lease change\n- Eviction mention\n- Angry complaint\n- Unclear message\n- Missing property address\n- Missing unit number\n- Missing contact info\n- Low confidence\n\nWhen human_review_required is true, set safe_to_continue_workflow to false.\n\nFor emergency maintenance:\n- Always create internal alert\n- Always recommend immediate phone follow-up\n- Do not route through normal maintenance queue only\n\nFor unclear requests:\n- Do not guess\n- Set category to \"General Admin\"\n- Set human_review_required to true\n- Request clarification in suggested_reply\n\nYou have access to a knowledge base tool with company policies, SOPs, office hours, vendor lists, emergency procedures, rent rules, and lease procedures. Use it to provide company-specific answers.\n\nReturn the response in the structured JSON format defined by the output parser."
+        }
+      },
+      "id": "7a53cc5f-4082-4c16-b69b-e13f54824db1",
+      "name": "Property Management AI Assistant",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        64,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "3da6edfc-93f8-4a47-b2c8-215f802567e6",
+      "name": "OpenAI GPT-5",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -80,
+        1424
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": {
+          "category": "Emergency Maintenance",
+          "priority": "Emergency",
+          "summary": "Brief summary of the request",
+          "recommended_action": "What the property management team should do next",
+          "suggested_reply": "Professional response to send",
+          "extracted_details": {
+            "name": "",
+            "phone": "",
+            "email": "",
+            "property_address": "",
+            "unit_number": "",
+            "issue_type": "",
+            "desired_appointment_time": "",
+            "move_in_date": "",
+            "budget": "",
+            "pets": "",
+            "urgency": "",
+            "notes": ""
+          },
+          "sms": {
+            "send_sms": false,
+            "message": ""
+          },
+          "email": {
+            "send_email": false,
+            "subject": "",
+            "body": ""
+          },
+          "missing_information": false,
+          "missing_fields": [],
+          "safe_to_continue_workflow": true,
+          "human_review_required": false,
+          "recommended_fallback": ""
+        }
+      },
+      "id": "86814bf1-a810-4edc-98ba-44dfe12f078a",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        976,
+        1328
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "property-management",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "ac3da8b1-6935-4d20-9e72-cb65bbfc5f1d",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -304,
+        1296
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.category }}",
+                    "rightValue": "Emergency Maintenance",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Emergency"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.category }}",
+                    "rightValue": "Standard Maintenance",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Standard Maintenance"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.category }}",
+                    "rightValue": "Leasing Inquiry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Leasing"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.category }}",
+                    "rightValue": "Rent / Payment Issue",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Rent Issue"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.category }}",
+                    "rightValue": "Vendor / Scheduling",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Vendor"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.category }}",
+                    "rightValue": "Lease Renewal",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Lease Renewal"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.category }}",
+                    "rightValue": "Tenant Communication",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Tenant Comm"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Other"
+        }
+      },
+      "id": "6e35a868-35dc-4751-9e7e-0687756d076a",
+      "name": "Route by Category",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2720,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Property Management AI Assistant').item.json.human_review_required }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            },
+            {
+              "leftValue": "={{ $('Property Management AI Assistant').item.json.safe_to_continue_workflow }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "21ea6964-f763-46f0-a049-3531e365c761",
+      "name": "Check Human Review",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3168,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=⚠️ HUMAN REVIEW REQUIRED\n\nCategory: {{ $('Property Management AI Assistant').item.json.category }}\nPriority: {{ $('Property Management AI Assistant').item.json.priority }}\nReason: {{ $('Property Management AI Assistant').item.json.recommended_fallback }}\n\nSummary: {{ $('Property Management AI Assistant').item.json.summary }}\n\nMissing Fields: {{ $('Property Management AI Assistant').item.json.missing_fields.join(\", \") }}\n\nTenant: {{ $('Property Management AI Assistant').item.json.extracted_details.name }}\nContact: {{ $('Property Management AI Assistant').item.json.extracted_details.phone }} / {{ $('Property Management AI Assistant').item.json.extracted_details.email }}",
+        "otherOptions": {}
+      },
+      "id": "a6fd5097-0f40-4a85-a063-aa1bbc458309",
+      "name": "Human Review Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3840,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "b32b3456-d6bc-4398-923a-b9ed423b890a",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        4064,
+        104
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=🚨 EMERGENCY MAINTENANCE REQUEST\n\nCategory: {{ $('Property Management AI Assistant').item.json.category }}\nPriority: {{ $('Property Management AI Assistant').item.json.priority }}\nProperty: {{ $('Property Management AI Assistant').item.json.extracted_details.property_address }}\nUnit: {{ $('Property Management AI Assistant').item.json.extracted_details.unit_number }}\nTenant: {{ $('Property Management AI Assistant').item.json.extracted_details.name }}\nPhone: {{ $('Property Management AI Assistant').item.json.extracted_details.phone }}\n\nIssue: {{ $('Property Management AI Assistant').item.json.summary }}\n\nRecommended Action: {{ $('Property Management AI Assistant').item.json.recommended_action }}",
+        "otherOptions": {}
+      },
+      "id": "a4e72d6b-34b6-4f11-8e69-333742fc1849",
+      "name": "Emergency Alert (Slack)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3392,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "dfbec573-ab27-4687-ba49-81a9245f2dcf",
+      "name": "Standard Maintenance Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2944,
+        1208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Property Management AI Assistant').item.json.sms.send_sms }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3cf5871c-b2b3-42bc-9ca8-6386e9d0d7b7",
+      "name": "Check SMS Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3840,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $('Property Management AI Assistant').item.json.extracted_details.phone }}",
+        "message": "={{ $('Property Management AI Assistant').item.json.sms.message }}",
+        "options": {}
+      },
+      "id": "509ae2f7-a86b-4a0d-a621-5dd40bd37fbb",
+      "name": "Send SMS (Twilio)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4064,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Property Management AI Assistant').item.json.email.send_email }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e1daa638-04c3-4621-905b-4b22eea5adde",
+      "name": "Check Email Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4064,
+        1112
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "<__PLACEHOLDER_VALUE__Your property management email (e.g., support@property.com)__>",
+        "toEmail": "={{ $('Property Management AI Assistant').item.json.extracted_details.email }}",
+        "subject": "={{ $('Property Management AI Assistant').item.json.email.subject }}",
+        "html": "={{ $('Property Management AI Assistant').item.json.email.body }}",
+        "options": {}
+      },
+      "id": "6471e745-5b6a-4fcc-9b09-07a94f2c88df",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4288,
+        1112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "0320f2e2-9759-48df-8a84-04a0097b5750",
+      "name": "Leasing Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2944,
+        1760
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "68da7685-88c4-4ed6-89ea-7ebbc81e44c4",
+      "name": "Rent Issue Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2944,
+        2408
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "4a3d1bfe-339f-4cc1-b973-68977d25a8a9",
+      "name": "Other Requests Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2944,
+        2696
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "team": "<__PLACEHOLDER_VALUE__Your ClickUp Team ID__>",
+        "space": "<__PLACEHOLDER_VALUE__Your ClickUp Space ID__>",
+        "folderless": true,
+        "list": "<__PLACEHOLDER_VALUE__Your ClickUp List ID__>",
+        "name": "=🚨 EMERGENCY: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }} - {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}",
+        "additionalFields": {
+          "content": "=Priority: {{ $(\"Property Management AI Assistant\").item.json.priority }}\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }}\nPhone: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}\n\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\n\nRecommended Action: {{ $(\"Property Management AI Assistant\").item.json.recommended_action }}\n\nStatus: New\nCreated: {{ $now.toISO() }}",
+          "notifyAll": true,
+          "priority": 1,
+          "status": "New"
+        }
+      },
+      "id": "8524598f-2d38-47ec-9813-5713dc9c938c",
+      "name": "Create Emergency Task",
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        3616,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "<__PLACEHOLDER_VALUE__Property Manager Phone (e.g., +15559876543)__>",
+        "message": "=🚨 EMERGENCY: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }} {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}",
+        "options": {}
+      },
+      "id": "8dffc8bc-8578-4fd1-98bc-9a1dd3a6c893",
+      "name": "Emergency SMS Alert",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        3840,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "team": "<__PLACEHOLDER_VALUE__Your ClickUp Team ID__>",
+        "space": "<__PLACEHOLDER_VALUE__Your ClickUp Space ID__>",
+        "folderless": true,
+        "list": "<__PLACEHOLDER_VALUE__Your ClickUp List ID__>",
+        "name": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }} - {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}",
+        "additionalFields": {
+          "content": "=Priority: {{ $(\"Property Management AI Assistant\").item.json.priority }}\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }}\nPhone: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}\n\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\n\nStatus: New\nCreated: {{ $now.toISO() }}",
+          "priority": 2,
+          "status": "New"
+        }
+      },
+      "id": "4e677822-1977-423a-bf63-993323f94a5d",
+      "name": "Create Maintenance Task",
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        3168,
+        1208
+      ]
+    },
+    {
+      "parameters": {
+        "team": "<__PLACEHOLDER_VALUE__Your ClickUp Team ID__>",
+        "space": "<__PLACEHOLDER_VALUE__Your ClickUp Space ID__>",
+        "folderless": true,
+        "list": "<__PLACEHOLDER_VALUE__Your ClickUp List ID__>",
+        "name": "=New Lead: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }}",
+        "additionalFields": {
+          "content": "=Name: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }}\nPhone: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}\nEmail: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.email }}\nMove-in Date: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.move_in_date }}\nBudget: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.budget }}\nPets: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.pets }}\n\nNotes: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.notes }}",
+          "priority": 2,
+          "status": "<__PLACEHOLDER_VALUE__Your ClickUp Status (e.g., new lead)__>"
+        }
+      },
+      "id": "1ca5dfc9-fb67-4ff9-acc3-b149a690118b",
+      "name": "Create Leasing Task",
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        3168,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "2cf024dd-f665-427f-8c14-655d650fae3c",
+      "name": "Vendor Scheduling Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3168,
+        2552
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "39a0b067-a397-419f-93b8-8a387ad8936e",
+      "name": "Lease Renewal Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3840,
+        2888
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "fefbc008-99a0-423b-816c-ed012c65c18f",
+      "name": "Tenant Communication Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3616,
+        2984
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const currentRequest = $input.first().json;\nconst tenant = currentRequest.extracted_details?.name || '';\nconst property = currentRequest.extracted_details?.property_address || '';\nconst unit = currentRequest.extracted_details?.unit_number || '';\nconst issue = currentRequest.extracted_details?.issue_type || currentRequest.summary || '';\n\nconst duplicateKey = `${tenant.toLowerCase()}_${property.toLowerCase()}_${unit}_${issue.toLowerCase()}`;\n\nconst isDuplicate = false;\n\nreturn [{ ...currentRequest, duplicate_check: { is_duplicate: isDuplicate, duplicate_key: duplicateKey, checked_at: new Date().toISOString() } }];"
+      },
+      "id": "a975ff4e-440f-4df0-9218-e070a58a8561",
+      "name": "Check Duplicate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.duplicate_check.is_duplicate }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c63ff868-5b31-4f34-abef-bd7680920eaa",
+      "name": "Filter Duplicates",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        1408,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "Emergency",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "High",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c741a10-9255-48f7-8600-ba01cf91657d",
+      "name": "Check Owner Notification Needed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3392,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "<__PLACEHOLDER_VALUE__Your property management email__>",
+        "toEmail": "<__PLACEHOLDER_VALUE__Property owner email__>",
+        "subject": "=Property Alert: {{ $json.priority }} - {{ $json.extracted_details.property_address }}",
+        "html": "=<h2>Property Maintenance Alert</h2><p><strong>Priority:</strong> {{ $json.priority }}</p><p><strong>Property:</strong> {{ $json.extracted_details.property_address }}</p><p><strong>Unit:</strong> {{ $json.extracted_details.unit_number }}</p><p><strong>Issue:</strong> {{ $json.summary }}</p><p><strong>Tenant:</strong> {{ $json.extracted_details.name }}</p><p><strong>Recommended Action:</strong> {{ $json.recommended_action }}</p>",
+        "options": {}
+      },
+      "id": "32f8074d-5d09-43d0-9211-2b9d7a0976f8",
+      "name": "Notify Owner",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3616,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 24,
+        "unit": "hours"
+      },
+      "id": "9cf85561-9b37-4c42-aff1-9a3ade9c61c8",
+      "name": "Wait 24h Tenant Followup",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4288,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}",
+        "message": "=Hi {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }}, checking in on your maintenance request for {{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}. Our team is working on it. Reply if you have questions.",
+        "options": {}
+      },
+      "id": "81cf938c-ee82-428b-9a4d-a51a3422c3fa",
+      "name": "Send Tenant Followup",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4512,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "or",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "HVAC",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "heating",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "cooling",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "air conditioning",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "HVAC"
+            },
+            {
+              "conditions": {
+                "combinator": "or",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "plumbing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "leak",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "water",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "drain",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Plumbing"
+            },
+            {
+              "conditions": {
+                "combinator": "or",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "electrical",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "electric",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "power",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "outlet",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Electrical"
+            },
+            {
+              "conditions": {
+                "combinator": "or",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "lockout",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "locked out",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "lock",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Locksmith"
+            },
+            {
+              "conditions": {
+                "combinator": "or",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "pest",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "bug",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "rodent",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}",
+                    "rightValue": "insect",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Pest Control"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "General Vendor"
+        }
+      },
+      "id": "2291deed-5d7d-42ca-80be-935b57c14f3b",
+      "name": "Route by Issue Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        3840,
+        1912
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "<__PLACEHOLDER_VALUE__HVAC Vendor Phone__>",
+        "message": "=New HVAC Request\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }} {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}\n\nReply ACCEPT or DECLINE",
+        "options": {}
+      },
+      "id": "80b5974e-d90f-489f-b50d-58eaf27477c5",
+      "name": "Notify HVAC Vendor",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4064,
+        1784
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "hours"
+      },
+      "id": "75320d4a-35ee-447f-9a61-105f7b0891f5",
+      "name": "Wait 2h Vendor Followup",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4512,
+        1904
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "<__PLACEHOLDER_VALUE__Plumber Phone__>",
+        "message": "=New Plumbing Request\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }} {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}",
+        "options": {}
+      },
+      "id": "5c962429-1e78-4659-9fff-0d72d3983c34",
+      "name": "Notify Plumbing Vendor",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4288,
+        1976
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "<__PLACEHOLDER_VALUE__Electrician Phone__>",
+        "message": "=New Electrical Request\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }} {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}",
+        "options": {}
+      },
+      "id": "6cba5dd7-2637-41c1-8aee-fd793f1266e7",
+      "name": "Notify Electrical Vendor",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4288,
+        2168
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "<__PLACEHOLDER_VALUE__Locksmith Phone__>",
+        "message": "=URGENT Lockout\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }} {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}",
+        "options": {}
+      },
+      "id": "be0052e5-4135-4286-a05e-7eab9fe37964",
+      "name": "Notify Locksmith",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4064,
+        2600
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "<__PLACEHOLDER_VALUE__Pest Control Phone__>",
+        "message": "=New Pest Control Request\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }} {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}",
+        "options": {}
+      },
+      "id": "3f3899c7-63c8-43a9-85a1-f59f9871f643",
+      "name": "Notify Pest Control",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4288,
+        2744
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "start": "={{ $json.extracted_details.desired_appointment_time || $now.plus(1, \"day\").toISO() }}",
+        "end": "={{ $json.extracted_details.desired_appointment_time ? $now.plus(1, \"hour\").toISO() : $now.plus(1, \"day\").plus(1, \"hour\").toISO() }}",
+        "additionalFields": {
+          "description": "=Property: {{ $json.extracted_details.property_address }}\nUnit: {{ $json.extracted_details.unit_number }}\nTenant: {{ $json.extracted_details.name }}\nPhone: {{ $json.extracted_details.phone }}\nIssue: {{ $json.summary }}",
+          "location": "={{ $json.extracted_details.property_address }}",
+          "summary": "={{ $json.category }}: {{ $json.extracted_details.property_address }}"
+        }
+      },
+      "id": "2bdf0c6b-a02c-4b05-ba0b-008fa9349952",
+      "name": "Create Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        3392,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}",
+        "message": "=Your {{ $(\"Property Management AI Assistant\").item.json.category }} is scheduled. We will keep you updated.",
+        "options": {}
+      },
+      "id": "dda2dfd9-77ba-447f-8813-808e9bfe77fb",
+      "name": "Send Calendar Confirmation",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        3616,
+        2624
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "4318ef53-1938-4041-890c-ab7c641044c7",
+      "name": "Weekly Report Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -48,
+        3208
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "3d5f74cd-ddad-4f2d-9cfd-26ff662688ed",
+      "name": "Fetch Weekly Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        176,
+        3208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst totalRequests = items.length;\nconst emergencyCount = items.filter(i => i.json.priority === 'Emergency').length;\nconst openTasks = items.filter(i => i.json.status !== 'completed').length;\nconst leasingLeads = items.filter(i => i.json.category === 'Leasing Inquiry').length;\nconst complaints = items.filter(i => i.json.category === 'Tenant Communication' && i.json.priority === 'High').length;\n\nreturn [{ report: { total_requests: totalRequests, emergency_count: emergencyCount, open_tasks: openTasks, leasing_leads: leasingLeads, complaints: complaints, week_ending: new Date().toISOString() } }];"
+      },
+      "id": "43f47ae6-b125-4fd2-8948-3c8a45dff203",
+      "name": "Aggregate Report Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        3208
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "<__PLACEHOLDER_VALUE__Your property management email__>",
+        "toEmail": "<__PLACEHOLDER_VALUE__Manager email__>",
+        "subject": "=Weekly Property Management Report - {{ $now.toFormat(\"MMM d, yyyy\") }}",
+        "html": "=<h2>Weekly Property Management Report</h2><p><strong>Total Requests:</strong> {{ $json.report.total_requests }}</p><p><strong>Emergency Count:</strong> {{ $json.report.emergency_count }}</p><p><strong>Open Tasks:</strong> {{ $json.report.open_tasks }}</p><p><strong>Leasing Leads:</strong> {{ $json.report.leasing_leads }}</p><p><strong>Complaints:</strong> {{ $json.report.complaints }}</p>",
+        "options": {}
+      },
+      "id": "a7a8356a-7167-43e7-bc9b-91c7249ddfec",
+      "name": "Send Weekly Report",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        3208
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=⏰ Vendor Follow-up Needed\n\nNo response from primary vendor for:\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }}\n\nRouting to backup vendor...",
+        "otherOptions": {}
+      },
+      "id": "d6d41ddf-e7db-4d7e-bae0-a58280c09c89",
+      "name": "Vendor No Response Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        4736,
+        1664
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.priority }}",
+              "rightValue": "Emergency",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $(\"Property Management AI Assistant\").item.json.estimated_cost || 0 }}",
+              "rightValue": 250,
+              "operator": {
+                "type": "number",
+                "operation": "smaller"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "03e7e389-0587-4eed-be83-a136b979fcb5",
+      "name": "Check Cost Threshold",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3392,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=✅ Auto-Approved (Under $250)\n\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nEstimated Cost: ${{ $(\"Property Management AI Assistant\").item.json.estimated_cost || \"TBD\" }}\n\nVendor dispatched.",
+        "otherOptions": {}
+      },
+      "id": "357169a4-5815-4308-893d-8cae62a78691",
+      "name": "Auto-Approve & Proceed",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3616,
+        1400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "id": "={{ $(\"Create Maintenance Task\").item.json.id }}",
+        "updateFields": {
+          "status": "Assigned"
+        }
+      },
+      "id": "88f4caee-66a9-4c8e-8229-60617c8eb02c",
+      "name": "Update Task Status: Assigned",
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        4288,
+        1784
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=💰 APPROVAL REQUIRED (Over $250)\n\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nEstimated Cost: ${{ $(\"Property Management AI Assistant\").item.json.estimated_cost || \"TBD\" }}\n\nPlease approve or decline in ClickUp task.",
+        "otherOptions": {}
+      },
+      "id": "ce27b116-e584-4591-a115-81022e719cc5",
+      "name": "Request Manager Approval",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3616,
+        1592
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 48,
+        "unit": "hours"
+      },
+      "id": "1a97bf06-cbca-4f8f-9bd8-daa6fe1678af",
+      "name": "Wait 48h SLA Check",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3392,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "id": "={{ $(\"Create Maintenance Task\").item.json.id }}"
+      },
+      "id": "9c662ff7-a236-4bce-91ad-6a8a94179062",
+      "name": "Check Task Completed",
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        3616,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "Completed",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "Closed",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "586c3f94-aefb-4f09-aa0e-c80b4eb45a81",
+      "name": "Check If Unresolved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3840,
+        1328
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=⚠️ SLA VIOLATION: Task Unresolved After 48 Hours\n\nTask ID: {{ $(\"Check Task Completed\").item.json.id }}\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nStatus: {{ $(\"Check Task Completed\").item.json.status }}\n\nImmediate escalation required.",
+        "otherOptions": {}
+      },
+      "id": "007048ba-d056-40f9-8cf9-e54b32365d7c",
+      "name": "SLA Violation Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        4064,
+        1592
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}",
+        "message": "=Hi {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }}, your maintenance request for {{ $(\"Property Management AI Assistant\").item.json.extracted_details.issue_type }} has been completed. Was this resolved to your satisfaction? Reply YES or NO.",
+        "options": {}
+      },
+      "id": "4c688a8b-711c-45e8-9afa-b0a7d172b6b6",
+      "name": "Send Completion Survey",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4064,
+        1304
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST",
+        "limitWaitTime": true,
+        "options": {
+          "webhookSuffix": "survey-response"
+        }
+      },
+      "id": "6974f2ce-5ca8-4357-a48f-cb18054c2f98",
+      "name": "Wait for Survey Response",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4288,
+        1304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.Body }}",
+              "rightValue": "NO",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "leftValue": "={{ $json.body.Body }}",
+              "rightValue": "not",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4345b74a-8f99-47c7-9d92-4360a720d4a2",
+      "name": "Check Satisfaction",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4512,
+        1304
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=🔄 TENANT NOT SATISFIED - Task Reopened\n\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nTenant Response: {{ $json.body.Body }}\n\nFollow-up required.",
+        "otherOptions": {}
+      },
+      "id": "becc7f0d-7907-4d53-872f-68c853e8bd14",
+      "name": "Reopen Task & Alert Manager",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        4736,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "id": "={{ $(\"Create Maintenance Task\").item.json.id }}",
+        "updateFields": {
+          "status": "Follow-up Needed"
+        }
+      },
+      "id": "00a1ff07-7ca9-4958-aae2-7b50419752d9",
+      "name": "Update Task: Reopened",
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        4960,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "a7473dc6-8288-499c-86ca-290ca4a266c9",
+      "name": "Log Satisfaction (Positive)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        4960,
+        1280
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "id": "={{ $(\"Create Maintenance Task\").item.json.id }}",
+        "updateFields": {
+          "status": "Closed"
+        }
+      },
+      "id": "14b6eaf0-37cf-4643-b2d4-8fe21d131800",
+      "name": "Close Ticket",
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        4736,
+        1280
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "<__PLACEHOLDER_VALUE__Backup HVAC Vendor Phone__>",
+        "message": "=URGENT HVAC Request (Primary vendor unavailable)\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }} {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}\n\nReply ACCEPT or DECLINE",
+        "options": {}
+      },
+      "id": "5691933c-693f-4d04-93e6-1e806cade86c",
+      "name": "Notify Backup HVAC Vendor",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4960,
+        1664
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "<__PLACEHOLDER_VALUE__Backup Plumber Phone__>",
+        "message": "=URGENT Plumbing Request (Primary vendor unavailable)\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }} {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}",
+        "options": {}
+      },
+      "id": "ffeb443a-fc4d-499f-b909-244b0143a04b",
+      "name": "Notify Backup Plumbing Vendor",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4736,
+        1976
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "<__PLACEHOLDER_VALUE__Backup Electrician Phone__>",
+        "message": "=URGENT Electrical Request (Primary vendor unavailable)\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nIssue: {{ $(\"Property Management AI Assistant\").item.json.summary }}\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }} {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}",
+        "options": {}
+      },
+      "id": "13925fd9-ddc7-4664-8e75-1571e4bdc4e4",
+      "name": "Notify Backup Electrical Vendor",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        4736,
+        2168
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "c3499d1b-6d99-43ec-9878-8c078409de76",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        3432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nconst workflowId = $workflow.id;\nconst executionId = $execution.id;\nconst failedNode = error.node?.name || \"Unknown\";\nconst errorMessage = error.error?.message || \"No error message\";\nconst timestamp = new Date().toISOString();\n\nreturn [{\n  workflow_id: workflowId,\n  execution_id: executionId,\n  failed_node: failedNode,\n  error_message: errorMessage,\n  timestamp: timestamp,\n  execution_url: `https://app.n8n.cloud/workflow/${workflowId}/executions/${executionId}`\n}];"
+      },
+      "id": "9d02cace-7ce6-4cc5-8657-9683a46333e1",
+      "name": "Format Error Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        3432
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=🚨 WORKFLOW ERROR\n\nWorkflow: Property Management AI Assistant\nFailed Node: {{ $json.failed_node }}\nError: {{ $json.error_message }}\nTime: {{ $json.timestamp }}\n\nExecution URL: {{ $json.execution_url }}",
+        "otherOptions": {}
+      },
+      "id": "666669ce-e3e2-4062-ab91-95bf14837b60",
+      "name": "Alert Admin (Error)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        400,
+        3432
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "<__PLACEHOLDER_VALUE__Your property management email__>",
+        "toEmail": "<__PLACEHOLDER_VALUE__Admin email__>",
+        "subject": "=n8n Workflow Error - {{ $json.failed_node }}",
+        "html": "=<h2>Workflow Execution Error</h2><p><strong>Workflow:</strong> Property Management AI Assistant</p><p><strong>Failed Node:</strong> {{ $json.failed_node }}</p><p><strong>Error Message:</strong> {{ $json.error_message }}</p><p><strong>Timestamp:</strong> {{ $json.timestamp }}</p><p><strong>Execution URL:</strong> <a href=\"{{ $json.execution_url }}\">View Execution</a></p>",
+        "options": {}
+      },
+      "id": "d21cfae8-057b-47be-8bfd-62aeb66399a6",
+      "name": "Email Admin (Error)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        3432
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "ec1a5ba2-1fcc-4ae2-abfa-1e18d274fffa",
+      "name": "Log Error to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        848,
+        3432
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputText": "={{ $json.summary }}",
+        "options": {
+          "categories": "Angry, Frustrated, Threatening, Calm, Neutral",
+          "includeDetailedResults": true
+        }
+      },
+      "id": "4d8f957b-be15-442c-b8f7-a8c2f3052e90",
+      "name": "Analyze Sentiment",
+      "type": "@n8n/n8n-nodes-langchain.sentimentAnalysis",
+      "typeVersion": 1.1,
+      "position": [
+        1248,
+        1808
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "id": "f73cff3d-679a-49de-814c-ad8852c3ac92",
+      "name": "Sentiment Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1320,
+        2128
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "sentiment_analysis",
+              "value": "={{ $json }}",
+              "type": "object"
+            },
+            {
+              "id": "2",
+              "name": "escalation_risk",
+              "value": "={{ [\"Angry\", \"Frustrated\", \"Threatening\"].includes($json.sentiment) }}",
+              "type": "boolean"
+            },
+            {
+              "id": "3",
+              "name": "sentiment_priority_boost",
+              "value": "={{ $json.confidence > 0.7 && [\"Angry\", \"Threatening\"].includes($json.sentiment) }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "6984ec64-8933-4fd0-a09a-c478bce78958",
+      "name": "Add Sentiment Score",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1600,
+        1808
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.escalation_risk }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            },
+            {
+              "leftValue": "={{ $json.sentiment_priority_boost }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d94e45d5-fd18-4d63-aa4e-2ab797598aff",
+      "name": "Check Escalation Risk",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1824,
+        1808
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=HIGH ESCALATION RISK - Angry/Threatening Tenant\n\nSentiment: {{ $json.sentiment_analysis.sentiment }}\nConfidence: {{ $json.sentiment_analysis.confidence }}\n\nTenant: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }}\nProperty: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}\nUnit: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}\nContact: {{ $(\"Property Management AI Assistant\").item.json.extracted_details.phone }}\n\nMessage: {{ $(\"Property Management AI Assistant\").item.json.summary }}\n\nDO NOT AUTO-RESPOND - Manager call required",
+        "otherOptions": {}
+      },
+      "id": "d42be73e-26ba-4ac0-ac6f-f582d2e7b056",
+      "name": "Escalate Angry Tenant",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2048,
+        1736
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "priority",
+              "value": "High",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "human_review_required",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "3",
+              "name": "bypass_automation",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "cc48fc1d-0e22-46a6-874c-085923a2fa6a",
+      "name": "Boost Priority",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2272,
+        1736
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "tenant_name": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.name }}",
+            "property_address": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.property_address }}",
+            "unit_number": "={{ $(\"Property Management AI Assistant\").item.json.extracted_details.unit_number }}",
+            "category": "={{ $(\"Property Management AI Assistant\").item.json.category }}",
+            "priority": "={{ $(\"Add Sentiment Score\").item.json.priority || $(\"Property Management AI Assistant\").item.json.priority }}",
+            "sentiment": "={{ $(\"Add Sentiment Score\").item.json.sentiment_analysis?.sentiment || \"N/A\" }}",
+            "sentiment_confidence": "={{ $(\"Add Sentiment Score\").item.json.sentiment_analysis?.confidence || 0 }}",
+            "escalation_risk": "={{ $(\"Add Sentiment Score\").item.json.escalation_risk || false }}",
+            "message_summary": "={{ $(\"Property Management AI Assistant\").item.json.summary }}",
+            "action_taken": "={{ $(\"Boost Priority\").item.json.bypass_automation ? \"Escalated to Manager\" : \"Automated Processing\" }}",
+            "sms_sent": "={{ $(\"Property Management AI Assistant\").item.json.sms.send_sms }}",
+            "email_sent": "={{ $(\"Property Management AI Assistant\").item.json.email.send_email }}",
+            "human_review_required": "={{ $(\"Boost Priority\").item.json.human_review_required || $(\"Property Management AI Assistant\").item.json.human_review_required }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "51853bc3-4f51-419b-810d-bba987b9d000",
+      "name": "Log Communication Timeline",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2496,
+        1808
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "5d43e924-dbd6-4bee-a9ea-52ab63eeab78",
+      "name": "SLA Monitor Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -48,
+        3656
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "notEquals",
+              "keyValue": "Completed"
+            },
+            {
+              "keyName": "status",
+              "condition": "notEquals",
+              "keyValue": "Closed"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "9c157750-7d59-4121-8f7f-f81cdd026d9d",
+      "name": "Fetch Open Tasks",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        176,
+        3656
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst now = new Date();\nconst breaches = [];\n\nfor (const item of items) {\n  const createdAt = new Date(item.json.created_at);\n  const ageMinutes = (now - createdAt) / 1000 / 60;\n  \n  let breached = false;\n  let breachType = \"\";\n  \n  if (item.json.priority === \"Emergency\" && ageMinutes > 15) {\n    breached = true;\n    breachType = \"Emergency not handled in 15 minutes\";\n  } else if (item.json.category === \"Standard Maintenance\" && ageMinutes > 1440) {\n    breached = true;\n    breachType = \"Standard maintenance untouched after 24 hours\";\n  } else if (item.json.status === \"Assigned\" && ageMinutes > 120) {\n    breached = true;\n    breachType = \"Vendor no response after 2 hours\";\n  }\n  \n  if (breached) {\n    breaches.push({\n      ...item.json,\n      breach_type: breachType,\n      age_minutes: Math.round(ageMinutes),\n      breach_detected_at: now.toISOString()\n    });\n  }\n}\n\nreturn breaches;"
+      },
+      "id": "39f0f696-65c6-4175-91ac-de4c532474f5",
+      "name": "Check SLA Breach",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        3656
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=SLA BREACH DETECTED\\n\\nBreach Type: {{ $json.breach_type }}\\nTask ID: {{ $json.id }}\\nCategory: {{ $json.category }}\\nPriority: {{ $json.priority }}\\nAge: {{ $json.age_minutes }} minutes\\nProperty: {{ $json.property_address }}\\nUnit: {{ $json.unit_number }}\\n\\nIMMEDIATE ESCALATION REQUIRED",
+        "otherOptions": {}
+      },
+      "id": "3044e694-d6c2-446b-aaa6-1ebcb4dd42f7",
+      "name": "Alert SLA Breach",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        624,
+        3656
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "priority": "Emergency",
+            "status": "Escalated",
+            "escalated_at": "={{ $now.toISO() }}",
+            "escalation_reason": "={{ $json.breach_type }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "56d20415-e9e0-4d35-ae3c-8cc8a07c307e",
+      "name": "Auto-Escalate Priority",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        848,
+        3656
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Search company policies, SOPs, office hours, vendor lists, emergency procedures, rent rules, and lease procedures. Use this to answer questions about company-specific rules and procedures.",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "list",
+          "value": "company_knowledge_base"
+        },
+        "topK": 3
+      },
+      "id": "88990640-2205-4577-9da9-41639f42a7ba",
+      "name": "Knowledge Base Tool",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        48,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "f8f53a8a-a1c5-4e16-9abc-b4e3b3189f95",
+      "name": "Knowledge Base Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        128,
+        1632
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Property Management AI Assistant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI GPT-5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Property Management AI Assistant",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Property Management AI Assistant",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Property Management AI Assistant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Property Management AI Assistant": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Category": {
+      "main": [
+        [
+          {
+            "node": "Check Human Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Standard Maintenance Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leasing Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rent Issue Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Vendor Scheduling Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lease Renewal Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tenant Communication Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Other Requests Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Human Review": {
+      "main": [
+        [
+          {
+            "node": "Human Review Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Emergency Alert (Slack)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check SMS Enabled",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Owner Notification Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Review Alert": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Emergency Alert (Slack)": {
+      "main": [
+        [
+          {
+            "node": "Create Emergency Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standard Maintenance Log": {
+      "main": [
+        [
+          {
+            "node": "Create Maintenance Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check SMS Enabled": {
+      "main": [
+        [
+          {
+            "node": "Send SMS (Twilio)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Email Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email Enabled": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leasing Log": {
+      "main": [
+        [
+          {
+            "node": "Create Leasing Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rent Issue Log": {
+      "main": [
+        [
+          {
+            "node": "Check Human Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Emergency Task": {
+      "main": [
+        [
+          {
+            "node": "Emergency SMS Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Emergency SMS Alert": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Maintenance Task": {
+      "main": [
+        [
+          {
+            "node": "Check Cost Threshold",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wait 48h SLA Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check SMS Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Leasing Task": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vendor Scheduling Log": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lease Renewal Log": {
+      "main": [
+        [
+          {
+            "node": "Check Email Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tenant Communication Log": {
+      "main": [
+        [
+          {
+            "node": "Check SMS Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Request": {
+      "main": [
+        [
+          {
+            "node": "Filter Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Analyze Sentiment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Owner Notification Needed": {
+      "main": [
+        [
+          {
+            "node": "Notify Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS (Twilio)": {
+      "main": [
+        [
+          {
+            "node": "Wait 24h Tenant Followup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 24h Tenant Followup": {
+      "main": [
+        [
+          {
+            "node": "Send Tenant Followup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Issue Type": {
+      "main": [
+        [
+          {
+            "node": "Notify HVAC Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Plumbing Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Electrical Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Locksmith",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Pest Control",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify HVAC Vendor": {
+      "main": [
+        [
+          {
+            "node": "Update Task Status: Assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2h Vendor Followup": {
+      "main": [
+        [
+          {
+            "node": "Vendor No Response Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Backup Plumbing Vendor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Backup Electrical Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Plumbing Vendor": {
+      "main": [
+        [
+          {
+            "node": "Wait 2h Vendor Followup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Electrical Vendor": {
+      "main": [
+        [
+          {
+            "node": "Wait 2h Vendor Followup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Pest Control": {
+      "main": [
+        [
+          {
+            "node": "Wait 2h Vendor Followup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Send Calendar Confirmation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check SMS Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Calendar Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Check SMS Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Report Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Weekly Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Weekly Data": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Report Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Report Data": {
+      "main": [
+        [
+          {
+            "node": "Send Weekly Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Cost Threshold": {
+      "main": [
+        [
+          {
+            "node": "Auto-Approve & Proceed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Request Manager Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-Approve & Proceed": {
+      "main": [
+        [
+          {
+            "node": "Route by Issue Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Task Status: Assigned": {
+      "main": [
+        [
+          {
+            "node": "Wait 2h Vendor Followup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 48h SLA Check": {
+      "main": [
+        [
+          {
+            "node": "Check Task Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Task Completed": {
+      "main": [
+        [
+          {
+            "node": "Check If Unresolved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Unresolved": {
+      "main": [
+        [
+          {
+            "node": "SLA Violation Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Completion Survey",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Completion Survey": {
+      "main": [
+        [
+          {
+            "node": "Wait for Survey Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Survey Response": {
+      "main": [
+        [
+          {
+            "node": "Check Satisfaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Satisfaction": {
+      "main": [
+        [
+          {
+            "node": "Reopen Task & Alert Manager",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Close Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reopen Task & Alert Manager": {
+      "main": [
+        [
+          {
+            "node": "Update Task: Reopened",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Close Ticket": {
+      "main": [
+        [
+          {
+            "node": "Log Satisfaction (Positive)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vendor No Response Alert": {
+      "main": [
+        [
+          {
+            "node": "Notify Backup HVAC Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Details": {
+      "main": [
+        [
+          {
+            "node": "Alert Admin (Error)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Admin (Error)": {
+      "main": [
+        [
+          {
+            "node": "Email Admin (Error)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Admin (Error)": {
+      "main": [
+        [
+          {
+            "node": "Log Error to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Owner": {
+      "main": [
+        []
+      ]
+    },
+    "Analyze Sentiment": {
+      "main": [
+        [
+          {
+            "node": "Add Sentiment Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sentiment Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyze Sentiment",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Sentiment Score": {
+      "main": [
+        [
+          {
+            "node": "Check Escalation Risk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Escalation Risk": {
+      "main": [
+        [
+          {
+            "node": "Escalate Angry Tenant",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Communication Timeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate Angry Tenant": {
+      "main": [
+        [
+          {
+            "node": "Boost Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Boost Priority": {
+      "main": [
+        [
+          {
+            "node": "Log Communication Timeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Communication Timeline": {
+      "main": [
+        [
+          {
+            "node": "Route by Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Monitor Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Open Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Open Tasks": {
+      "main": [
+        [
+          {
+            "node": "Check SLA Breach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check SLA Breach": {
+      "main": [
+        [
+          {
+            "node": "Alert SLA Breach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert SLA Breach": {
+      "main": [
+        [
+          {
+            "node": "Auto-Escalate Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Base Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Property Management AI Assistant",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Base Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Knowledge Base Tool",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
