@@ -1,0 +1,1333 @@
+{
+  "name": "Automated Invoice Email Detection and Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "downloadAttachments": true,
+        "options": {}
+      },
+      "id": "773c98ad-bf87-4777-84f3-839a5eacb7c2",
+      "name": "Watch for New Emails",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.1,
+      "position": [
+        256,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $('Watch for New Emails').item.json.subject }}",
+              "rightValue": "invoice",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "id-2",
+              "leftValue": "={{ $('Watch for New Emails').item.json.subject }}",
+              "rightValue": "bill",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "id-3",
+              "leftValue": "={{ $('Watch for New Emails').item.json.subject }}",
+              "rightValue": "receipt",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "id": "75dac369-423a-40d6-bd4b-6d8bb233e141",
+      "name": "Filter Invoice Emails",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "attachment_0",
+        "options": {
+          "maxPages": 10
+        }
+      },
+      "id": "b1694197-60ce-4062-8ba3-bdefb4c5b1a6",
+      "name": "Extract Invoice Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        928,
+        668
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an expert invoice data extraction assistant. Extract all relevant information from the invoice text with high accuracy. Pay special attention to: vendor name and contact details, invoice number and date, line items with descriptions, quantities, unit prices and totals, subtotal, tax amounts, and final total, currency, payment terms, and purchase order number if present. Be precise with numbers and dates."
+        }
+      },
+      "id": "97efdd17-28c4-4742-aab1-90f621b4f5b4",
+      "name": "Claude Invoice Parser",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1152,
+        668
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-3-5-sonnet-20241022"
+        },
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "id": "c451eed6-40b5-4f52-a7db-66fbe2c9cfab",
+      "name": "Claude Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1160,
+        892
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"vendor_name\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"Name of the vendor or company issuing the invoice\"\n\t\t},\n\t\t\"invoice_number\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"Unique invoice identifier\"\n\t\t},\n\t\t\"invoice_date\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"Date the invoice was issued\"\n\t\t},\n\t\t\"line_items\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"items\": {\n\t\t\t\t\"type\": \"object\",\n\t\t\t\t\"properties\": {\n\t\t\t\t\t\"description\": {\n\t\t\t\t\t\t\"type\": \"string\",\n\t\t\t\t\t\t\"description\": \"Description of the item or service\"\n\t\t\t\t\t},\n\t\t\t\t\t\"quantity\": {\n\t\t\t\t\t\t\"type\": \"number\",\n\t\t\t\t\t\t\"description\": \"Quantity of items\"\n\t\t\t\t\t},\n\t\t\t\t\t\"unit_price\": {\n\t\t\t\t\t\t\"type\": \"number\",\n\t\t\t\t\t\t\"description\": \"Price per unit\"\n\t\t\t\t\t},\n\t\t\t\t\t\"total\": {\n\t\t\t\t\t\t\"type\": \"number\",\n\t\t\t\t\t\t\"description\": \"Total price for this line item\"\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t},\n\t\t\t\"description\": \"List of items or services on the invoice\"\n\t\t},\n\t\t\"subtotal\": {\n\t\t\t\"type\": \"number\",\n\t\t\t\"description\": \"Subtotal amount before tax\"\n\t\t},\n\t\t\"tax\": {\n\t\t\t\"type\": \"number\",\n\t\t\t\"description\": \"Tax amount\"\n\t\t},\n\t\t\"total_amount\": {\n\t\t\t\"type\": \"number\",\n\t\t\t\"description\": \"Total amount including tax\"\n\t\t},\n\t\t\"currency\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"Currency code (e.g., USD, EUR, GBP)\"\n\t\t},\n\t\t\"payment_terms\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"Payment terms (e.g., Net 30, Due on receipt)\"\n\t\t},\n\t\t\"purchase_order_number\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"Purchase order number if applicable\"\n\t\t}\n\t},\n\t\"required\": [\"vendor_name\", \"invoice_number\", \"invoice_date\", \"total_amount\"]\n}"
+      },
+      "id": "f70a9846-ca32-401c-b3c5-4a86e204216c",
+      "name": "Structured Invoice Output",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1288,
+        892
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.vendor_name }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "isEmpty"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.invoice_number }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "isEmpty"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.total_amount }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "isEmpty"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "Missing Required Data"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.total_amount }}",
+                    "rightValue": "10000",
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Requires Approval"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.vendor_name }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "isNotEmpty"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.total_amount }}",
+                    "rightValue": "10000",
+                    "operator": {
+                      "type": "number",
+                      "operation": "lte"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Auto-Approved"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "5542529c-c2e6-40c6-8737-f0f65caf4341",
+      "name": "Validate Business Rules",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1872,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "vendor_name",
+              "value": "={{ $json.vendor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "invoice_number",
+              "value": "={{ $json.invoice_number }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "invoice_date",
+              "value": "={{ $json.invoice_date }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "total_amount",
+              "value": "={{ $json.total_amount }}",
+              "type": "number"
+            },
+            {
+              "id": "id-5",
+              "name": "currency",
+              "value": "={{ $json.currency }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "validation_status",
+              "value": "={{ $json.validation_status }}",
+              "type": "string"
+            },
+            {
+              "id": "id-7",
+              "name": "processed_date",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a52c9605-6129-463c-af59-25fddca7de45",
+      "name": "Prepare Invoice Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3296,
+        948
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__invoice_records_table__>"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": null
+        },
+        "options": {}
+      },
+      "id": "a674175a-b5ba-4f79-ad50-99576de01c42",
+      "name": "Store Invoice Records",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        948
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "validation_status",
+              "value": "Missing Required Data",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "b521023d-1c5f-49fb-b6e3-8ccfec375fca",
+      "name": "Mark Missing Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2624,
+        476
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "validation_status",
+              "value": "Requires Approval - High Amount",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "f35d7843-6493-4115-9c0f-072403165460",
+      "name": "Mark Needs Approval",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1952,
+        876
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "validation_status",
+              "value": "Auto-Approved",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "33231ff9-e637-4947-a374-bc10d643fbcb",
+      "name": "Mark Auto Approved",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2624,
+        1220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.total_amount }}",
+              "rightValue": "10000",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "id": "9bbd5777-0874-49da-8f7e-0231547319e1",
+      "name": "Check Amount for Escalation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2176,
+        804
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.vendor_name }}",
+                    "rightValue": "Acme Corp",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Acme Corp Approver"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.vendor_name }}",
+                    "rightValue": "TechSupply Inc",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "TechSupply Approver"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "cf6d658d-47ee-422b-aa5e-cdbb30cac07c",
+      "name": "Route by Vendor",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2400,
+        652
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "message",
+              "value": "=High-value invoice requiring manager approval:\n\nVendor: {{ $json.vendor_name }}\nInvoice #: {{ $json.invoice_number }}\nAmount: {{ $json.currency }} {{ $json.total_amount }}\nDate: {{ $json.invoice_date }}\n\nThis invoice exceeds the $10,000 threshold and requires manager approval.",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "approver_type",
+              "value": "Manager",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "385392bb-f379-4349-a522-cc36155577ac",
+      "name": "Prepare Manager Notification",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2624,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "message",
+              "value": "=Invoice approval needed:\n\nVendor: {{ $json.vendor_name }}\nInvoice #: {{ $json.invoice_number }}\nAmount: {{ $json.currency }} {{ $json.total_amount }}\nDate: {{ $json.invoice_date }}\n\nPlease review and approve this invoice.",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "approver_type",
+              "value": "Regular Approver",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4f2dfa35-c33b-4956-86cc-f00749f37a67",
+      "name": "Prepare Approver Notification",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2624,
+        668
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__manager_slack_channel__>"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "ae98b8cc-caf8-4c81-9421-62762f28ee18",
+      "name": "Notify Manager",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3072,
+        908
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__approver_slack_channel__>"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "7bf650dc-44ed-42e9-9a22-6a32503bb0b5",
+      "name": "Notify Approver",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3072,
+        716
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "action",
+              "value": "Invoice Received",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "invoice_number",
+              "value": "={{ $json.invoice_number || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "vendor_name",
+              "value": "={{ $json.vendor_name || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "total_amount",
+              "value": "={{ $json.total_amount || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "id-6",
+              "name": "details",
+              "value": "Email received and filtered as invoice",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f6c57d50-e7bb-44e3-a974-9fb6248a170f",
+      "name": "Log Invoice Received",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        704,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "action",
+              "value": "Data Extraction Complete",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "invoice_number",
+              "value": "={{ $json.invoice_number }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "vendor_name",
+              "value": "={{ $json.vendor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "total_amount",
+              "value": "={{ $json.total_amount }}",
+              "type": "number"
+            },
+            {
+              "id": "id-6",
+              "name": "details",
+              "value": "AI successfully extracted invoice data from PDF",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "363bb076-4915-42a0-a983-11a067d22f41",
+      "name": "Log Extraction Complete",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1504,
+        668
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "action",
+              "value": "Validation Failed - Missing Data",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "invoice_number",
+              "value": "={{ $json.invoice_number || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "vendor_name",
+              "value": "={{ $json.vendor_name || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "total_amount",
+              "value": "={{ $json.total_amount || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "id-6",
+              "name": "details",
+              "value": "Invoice flagged for missing required fields (vendor, invoice number, or amount)",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6c9fd3ef-99b3-488c-8452-08987c742a6d",
+      "name": "Log Missing Data Decision",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2848,
+        476
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "action",
+              "value": "Auto-Approved",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "invoice_number",
+              "value": "={{ $json.invoice_number }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "vendor_name",
+              "value": "={{ $json.vendor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "total_amount",
+              "value": "={{ $json.total_amount }}",
+              "type": "number"
+            },
+            {
+              "id": "id-6",
+              "name": "details",
+              "value": "=Invoice auto-approved (amount {{ $json.currency }} {{ $json.total_amount }} under $10,000 threshold)",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2b81ce84-9eef-4fcd-b448-c92792e9618f",
+      "name": "Log Auto Approval Decision",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2848,
+        1220
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "action",
+              "value": "Escalated to Manager",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "invoice_number",
+              "value": "={{ $json.invoice_number }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "vendor_name",
+              "value": "={{ $json.vendor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "total_amount",
+              "value": "={{ $json.total_amount }}",
+              "type": "number"
+            },
+            {
+              "id": "id-6",
+              "name": "details",
+              "value": "=High-value invoice ({{ $json.currency }} {{ $json.total_amount }}) escalated to manager for approval",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "60bd4108-19ae-401e-baf4-4afdeb5cc83e",
+      "name": "Log Manager Escalation",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2848,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "action",
+              "value": "Assigned to Approver",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "invoice_number",
+              "value": "={{ $json.invoice_number }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "vendor_name",
+              "value": "={{ $json.vendor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "total_amount",
+              "value": "={{ $json.total_amount }}",
+              "type": "number"
+            },
+            {
+              "id": "id-6",
+              "name": "details",
+              "value": "=Invoice routed to vendor-specific approver for {{ $json.vendor_name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2e240894-ffd1-4c98-8ddc-feeb045f99cf",
+      "name": "Log Approver Assignment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2848,
+        668
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "action",
+              "value": "={{ $json.action }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "timestamp",
+              "value": "={{ $json.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "invoice_number",
+              "value": "={{ $json.invoice_number }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "vendor_name",
+              "value": "={{ $json.vendor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "total_amount",
+              "value": "={{ $json.total_amount }}",
+              "type": "number"
+            },
+            {
+              "id": "id-6",
+              "name": "currency",
+              "value": "={{ $json.currency || 'USD' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-7",
+              "name": "details",
+              "value": "={{ $json.details }}",
+              "type": "string"
+            },
+            {
+              "id": "id-8",
+              "name": "workflow_execution_id",
+              "value": "={{ $execution.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b36fb5f3-8079-4b4e-a7f7-1d5779f26e4d",
+      "name": "Prepare Audit Entry",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3072,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__audit_trail_table__>"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": null
+        },
+        "options": {}
+      },
+      "id": "ee230055-9618-4358-a2e8-17d2777b7233",
+      "name": "Audit Trail Log",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        3296,
+        304
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2400,
+        864
+      ],
+      "typeVersion": 1,
+      "id": "b1fa799d-f1ae-4697-addb-f7a16286aff4",
+      "name": "Sticky Note"
+    }
+  ],
+  "connections": {
+    "Watch for New Emails": {
+      "main": [
+        [
+          {
+            "node": "Filter Invoice Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Invoice Emails": {
+      "main": [
+        [
+          {
+            "node": "Log Invoice Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Invoice Text": {
+      "main": [
+        [
+          {
+            "node": "Claude Invoice Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Claude Invoice Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Invoice Output": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Claude Invoice Parser",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Invoice Parser": {
+      "main": [
+        [
+          {
+            "node": "Log Extraction Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Business Rules": {
+      "main": [
+        [
+          {
+            "node": "Mark Missing Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Needs Approval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Auto Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Missing Data": {
+      "main": [
+        [
+          {
+            "node": "Log Missing Data Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Needs Approval": {
+      "main": [
+        [
+          {
+            "node": "Prepare Invoice Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Amount for Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Auto Approved": {
+      "main": [
+        [
+          {
+            "node": "Log Auto Approval Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Invoice Data": {
+      "main": [
+        [
+          {
+            "node": "Store Invoice Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Amount for Escalation": {
+      "main": [
+        [
+          {
+            "node": "Prepare Manager Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route by Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Manager Notification": {
+      "main": [
+        [
+          {
+            "node": "Log Manager Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Vendor": {
+      "main": [
+        [
+          {
+            "node": "Prepare Approver Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Approver Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Approver Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Approver Notification": {
+      "main": [
+        [
+          {
+            "node": "Log Approver Assignment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Manager": {
+      "main": [
+        [
+          {
+            "node": "Prepare Invoice Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Approver": {
+      "main": [
+        [
+          {
+            "node": "Prepare Invoice Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Invoice Received": {
+      "main": [
+        [
+          {
+            "node": "Extract Invoice Text",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Audit Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Extraction Complete": {
+      "main": [
+        [
+          {
+            "node": "Validate Business Rules",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Audit Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Missing Data Decision": {
+      "main": [
+        [
+          {
+            "node": "Prepare Invoice Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Audit Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Auto Approval Decision": {
+      "main": [
+        [
+          {
+            "node": "Prepare Invoice Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Audit Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Manager Escalation": {
+      "main": [
+        [
+          {
+            "node": "Notify Manager",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Audit Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Approver Assignment": {
+      "main": [
+        [
+          {
+            "node": "Notify Approver",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Audit Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Audit Entry": {
+      "main": [
+        [
+          {
+            "node": "Audit Trail Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

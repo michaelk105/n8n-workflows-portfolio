@@ -1,0 +1,712 @@
+{
+  "name": "Automated Invoice Processing and Data Extraction",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "Invoices Folder"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "id": "9d2485a0-49ce-4a42-bee6-b63c0e4042a6",
+      "name": "New Invoice File",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}",
+          "cachedResultName": "={{ $json.name }}"
+        },
+        "options": {
+          "binaryPropertyName": "fileData"
+        }
+      },
+      "id": "f06dacc3-7e7b-4102-b735-31b120edee5f",
+      "name": "Download File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        464,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const binaryData = $input.item.binary.fileData;\nconst base64String = binaryData.data;\nconst mimeType = binaryData.mimeType;\nconst fileName = binaryData.fileName;\n\nreturn {\n  json: {\n    base64: base64String,\n    mimeType: mimeType,\n    fileName: fileName,\n    fileId: $input.item.json.id,\n    originalName: $input.item.json.name\n  }\n};"
+      },
+      "id": "b0623b6a-adba-4d4d-b0e3-358c68ee6265",
+      "name": "Convert to Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mimeType }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    },
+                    "rightValue": "image/(jpeg|jpg|png)"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Image Files"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mimeType }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "application/pdf"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PDF Files"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "47c6fac3-8a8c-4366-a0f0-41059b276943",
+      "name": "Route by File Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        912,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__OCR API endpoint for images (e.g., https://api.ocr.space/parse/image)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"base64Image\": \"data:\" + $json.mimeType + \";base64,\" + $json.base64, \"language\": \"eng\" } }}",
+        "options": {}
+      },
+      "id": "98b5ffcf-d2d5-4b48-a78e-a4510863b044",
+      "name": "OCR Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1136,
+        304
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "81073c92-d9fe-4ac5-a251-8d5607f7d4ca",
+      "name": "Merge OCR Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1360,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__OCR API endpoint for PDFs (e.g., https://api.ocr.space/parse/image)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"base64Image\": \"data:\" + $json.mimeType + \";base64,\" + $json.base64, \"language\": \"eng\", \"isTable\": true } }}",
+        "options": {}
+      },
+      "id": "2660c5dd-a483-4025-91b7-7f4309c5ff1d",
+      "name": "OCR PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1136,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "text",
+              "name": "extractedText",
+              "value": "={{ $json.ParsedResults[0].ParsedText }}",
+              "type": "string"
+            },
+            {
+              "id": "fileId",
+              "name": "fileId",
+              "value": "={{ $('Convert to Base64').item.json.fileId }}",
+              "type": "string"
+            },
+            {
+              "id": "fileName",
+              "name": "fileName",
+              "value": "={{ $('Convert to Base64').item.json.originalName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "60433b46-2849-4bf9-8cb5-0726547a3255",
+      "name": "Clean OCR Text",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1584,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.extractedText }}",
+        "attributes": {
+          "attributes": [
+            {
+              "name": "vendorName",
+              "description": "Name of the vendor or supplier",
+              "required": true
+            },
+            {
+              "name": "invoiceNumber",
+              "description": "Invoice number or ID",
+              "required": true
+            },
+            {
+              "name": "invoiceDate",
+              "type": "date",
+              "description": "Date of the invoice",
+              "required": true
+            },
+            {
+              "name": "dueDate",
+              "type": "date",
+              "description": "Payment due date"
+            },
+            {
+              "name": "totalAmount",
+              "type": "number",
+              "description": "Total invoice amount",
+              "required": true
+            },
+            {
+              "name": "currency",
+              "description": "Currency code (e.g., USD, EUR)"
+            },
+            {
+              "name": "taxAmount",
+              "type": "number",
+              "description": "Tax amount if specified"
+            },
+            {
+              "name": "lineItems",
+              "description": "Description of line items or services"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bb8482f6-2bb1-4b0d-8c7f-897b16ad34c3",
+      "name": "Extract Invoice Data",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [
+        1808,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "model": "anthropic/claude-sonnet-4.6",
+        "options": {
+          "maxTokens": 2000,
+          "temperature": 0.2
+        }
+      },
+      "id": "ee948711-034e-4c7f-ade9-a8f720c80033",
+      "name": "OpenRouter Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1888,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "Invoice Tracker"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Invoices",
+          "cachedResultName": "Invoices"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Vendor Name": "={{ $json.vendorName }}",
+            "Invoice Number": "={{ $json.invoiceNumber }}",
+            "Invoice Date": "={{ $json.invoiceDate }}",
+            "Due Date": "={{ $json.dueDate }}",
+            "Total Amount": "={{ $json.totalAmount }}",
+            "Currency": "={{ $json.currency }}",
+            "Tax Amount": "={{ $json.taxAmount }}",
+            "Line Items": "={{ $json.lineItems }}",
+            "File Name": "={{ $json.fileName }}",
+            "Processed Date": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            {
+              "id": "Vendor Name",
+              "displayName": "Vendor Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Invoice Number",
+              "displayName": "Invoice Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Invoice Date",
+              "displayName": "Invoice Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "Due Date",
+              "displayName": "Due Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "Total Amount",
+              "displayName": "Total Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "Currency",
+              "displayName": "Currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "Tax Amount",
+              "displayName": "Tax Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "Line Items",
+              "displayName": "Line Items",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "File Name",
+              "displayName": "File Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "Processed Date",
+              "displayName": "Processed Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "826da739-9c39-4107-b555-d94dc6e7f983",
+      "name": "Add to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2160,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Extract Invoice Data').item.json.fileId }}",
+          "cachedResultName": "={{ $('Extract Invoice Data').item.json.fileName }}"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "Processed"
+        }
+      },
+      "id": "a254768c-c0c2-442d-99dc-73e60d3ce5fb",
+      "name": "Move to Processed Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2384,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Extract Invoice Data').item.json.fileId }}",
+          "cachedResultName": "={{ $('Extract Invoice Data').item.json.fileName }}"
+        },
+        "newUpdatedFileName": "={{ $(\"Extract Invoice Data\").item.json.invoiceNumber }}_{{ $(\"Extract Invoice Data\").item.json.invoiceDate }}_{{ $(\"Extract Invoice Data\").item.json.vendorName }}.pdf",
+        "options": {}
+      },
+      "id": "4d37b03c-6a0d-4abe-996a-4c9660beed54",
+      "name": "Rename File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2608,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 📥 Trigger\nMonitors Google Drive folder for new invoice files",
+        "height": 200,
+        "width": 300,
+        "color": 2
+      },
+      "id": "e53b1c40-0447-4ad4-8b92-884ad8216a6c",
+      "name": "Sticky Note 63c7dc8d",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 📂 File Retrieval\nDownloads the invoice file and converts to Base64",
+        "height": 200,
+        "width": 524,
+        "color": 3
+      },
+      "id": "3a56b7f5-039f-4032-9385-13de83a95765",
+      "name": "Sticky Note cb288108",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        416,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🔍 OCR Processing\nRoutes by file type and extracts text from images/PDFs",
+        "height": 392,
+        "width": 748,
+        "color": 4
+      },
+      "id": "e29f1ba4-e4f1-40f8-bc16-a26d5cd41544",
+      "name": "Sticky Note 9d36db5b",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        864,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🤖 AI Data Extraction\nCleans OCR text and extracts structured invoice data",
+        "height": 200,
+        "width": 524,
+        "color": 5
+      },
+      "id": "1eabffd8-c6e3-4f57-95bf-ea3b7102ecab",
+      "name": "Sticky Note 49f83462",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 💾 Storage & Organization\nSaves to Google Sheets, moves file, and renames with invoice details",
+        "height": 200,
+        "width": 748,
+        "color": 6
+      },
+      "id": "a4af8b1c-8f9a-479d-9410-8f13f0232746",
+      "name": "Sticky Note e1f2a806",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2112,
+        352
+      ]
+    }
+  ],
+  "connections": {
+    "New Invoice File": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Convert to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to Base64": {
+      "main": [
+        [
+          {
+            "node": "Route by File Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by File Type": {
+      "main": [
+        [
+          {
+            "node": "OCR Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OCR PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OCR Image": {
+      "main": [
+        [
+          {
+            "node": "Merge OCR Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge OCR Results": {
+      "main": [
+        [
+          {
+            "node": "Clean OCR Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OCR PDF": {
+      "main": [
+        [
+          {
+            "node": "Merge OCR Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Clean OCR Text": {
+      "main": [
+        [
+          {
+            "node": "Extract Invoice Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Invoice Data": {
+      "main": [
+        [
+          {
+            "node": "Add to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract Invoice Data",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Move to Processed Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move to Processed Folder": {
+      "main": [
+        [
+          {
+            "node": "Rename File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

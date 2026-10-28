@@ -1,0 +1,521 @@
+{
+  "name": "Automated Invoice Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "event": "fileCreated",
+        "options": {
+          "fileType": "all"
+        }
+      },
+      "id": "11b25e98-0aae-4a2d-a0ba-3212e9a306e2",
+      "name": "New Invoice/Receipt Uploaded",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        1456,
+        144
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "id": "b600d44d-f7d5-41ed-9fe5-41e80ba1bd02",
+      "name": "Download File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1824,
+        144
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mimeType }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "application/pdf"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mimeType }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "image/"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "288aac5a-bf0a-4ded-aa3e-301b1f5aed73",
+      "name": "Route by File Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1248,
+        368
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "c3792644-d8ab-46b5-b9fa-01952a411f76",
+      "name": "Extract Receipt Data (PDF)",
+      "type": "n8n-nodes-base.mindee",
+      "typeVersion": 3,
+      "position": [
+        1568,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "id": "93a4b2e9-1816-45cb-9068-90c2bfc2bc30",
+      "name": "Merge All Extractions",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1744,
+        336
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d2d689c7-d8f8-47be-ba84-1ca16ddaa755",
+      "name": "Extract Receipt Data (Image)",
+      "type": "n8n-nodes-base.mindee",
+      "typeVersion": 3,
+      "position": [
+        1568,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{ JSON.stringify($json) }}",
+        "attributes": {
+          "attributes": [
+            {
+              "name": "vendor_name",
+              "description": "Name of the vendor or supplier",
+              "required": true
+            },
+            {
+              "name": "total_amount",
+              "type": "number",
+              "description": "Total amount of the invoice or receipt",
+              "required": true
+            },
+            {
+              "name": "invoice_number",
+              "description": "Invoice or receipt number"
+            },
+            {
+              "name": "date",
+              "type": "date",
+              "description": "Invoice or receipt date",
+              "required": true
+            },
+            {
+              "name": "due_date",
+              "type": "date",
+              "description": "Payment due date (if available)"
+            },
+            {
+              "name": "document_type",
+              "description": "Type of document: invoice or receipt",
+              "required": true
+            },
+            {
+              "name": "category",
+              "description": "Expense category (e.g., Office Supplies, Travel, Meals)"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8a8233f8-c2ee-4993-b103-e0499cf980ba",
+      "name": "AI Extract Structured Data",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "bill",
+        "operation": "create",
+        "VendorRef": "={{ $json.vendor_name }}",
+        "Line": [
+          {
+            "Amount": "={{ $json.total_amount }}",
+            "Description": "={{ $json.document_type }} - {{ $json.invoice_number ?? \"No invoice number\" }} - {{ $json.category ?? \"General Expense\" }}",
+            "DetailType": "AccountBasedExpenseLineDetail",
+            "LineNum": 1
+          }
+        ],
+        "additionalFields": {
+          "DueDate": "={{ $json.due_date ?? $json.date }}",
+          "TotalAmt": "={{ $json.total_amount }}",
+          "TxnDate": "={{ $json.date }}"
+        }
+      },
+      "id": "bd0a602a-7081-42c0-aadf-01590264bb88",
+      "name": "Create QuickBooks Bill",
+      "type": "n8n-nodes-base.quickbooks",
+      "typeVersion": 1,
+      "position": [
+        1504,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $(\"Download File\").item.json.id }}"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "d8ca1f9d-63b5-4b30-9911-f3320e3ac84a",
+      "name": "Move to Processed Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1760,
+        704
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "📥 TRIGGER\nMonitors Google Drive folder for new invoices/receipts",
+        "height": 208,
+        "width": 440,
+        "color": 3
+      },
+      "id": "b8291863-45b8-4873-98fa-e277c28d509a",
+      "name": "Sticky Note 22a2cea2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "content": "📂 DOWNLOAD\nFetches file from Google Drive",
+        "height": 208,
+        "width": 600,
+        "color": 4
+      },
+      "id": "7197ddf9-4342-4aec-bbec-81460a1c755b",
+      "name": "Sticky Note ed628436",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "content": "🔀 ROUTING\nDetects file type (PDF or Image)",
+        "height": 320,
+        "width": 232,
+        "color": 5
+      },
+      "id": "aa621e15-f7e0-45df-b563-402faacd9680",
+      "name": "Sticky Note e0df5c02",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "content": "🤖 AI EXTRACTION\nMindee OCR extracts invoice data",
+        "height": 320,
+        "width": 480,
+        "color": 6
+      },
+      "id": "dae5879c-a1cc-4828-864d-58163bf2521b",
+      "name": "Sticky Note 6c1e4427",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "content": "🧠 AI PROCESSING\nOpenAI structures extracted data",
+        "height": 320,
+        "width": 368,
+        "color": 2
+      },
+      "id": "1613aadd-fdbb-4b47-a04c-132e4be81336",
+      "name": "Sticky Note 934ffb30",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "content": "💼 QUICKBOOKS\nCreates bill in QuickBooks",
+        "height": 272,
+        "width": 536
+      },
+      "id": "3612b8ae-6580-4ab4-a5fe-709628f64370",
+      "name": "Sticky Note 4a141953",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "content": "✅ ORGANIZE\nMoves processed file to archive folder",
+        "height": 240,
+        "width": 512,
+        "color": 3
+      },
+      "id": "7c32ad54-90bf-4aa2-8093-37c87aaa5c3c",
+      "name": "Sticky Note 01917b77",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6"
+        },
+        "options": {}
+      },
+      "id": "67b8022e-721b-4048-813c-1a0267527534",
+      "name": "Claude Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        1920,
+        512
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "name": "Anthropic account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "New Invoice/Receipt Uploaded": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Route by File Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by File Type": {
+      "main": [
+        [
+          {
+            "node": "Extract Receipt Data (PDF)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Receipt Data (Image)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Receipt Data (PDF)": {
+      "main": [
+        [
+          {
+            "node": "Merge All Extractions",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge All Extractions": {
+      "main": [
+        [
+          {
+            "node": "AI Extract Structured Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Receipt Data (Image)": {
+      "main": [
+        [
+          {
+            "node": "Merge All Extractions",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "AI Extract Structured Data": {
+      "main": [
+        [
+          {
+            "node": "Create QuickBooks Bill",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create QuickBooks Bill": {
+      "main": [
+        [
+          {
+            "node": "Move to Processed Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Extract Structured Data",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

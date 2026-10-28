@@ -1,0 +1,258 @@
+{
+  "name": "Email Invoice Retrieval and Response Generator for Printify Store",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {},
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "id": "3dc02743-7e47-4506-bcb7-d43812b66651",
+      "name": "Watch for Customer Emails",
+      "type": "n8n-nodes-base.microsoftOutlookTrigger",
+      "typeVersion": 1,
+      "position": [
+        256,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.subject }}",
+              "rightValue": "invoice",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "id": "d2bd9bc2-e485-40bc-b9b9-ac84f03bb0de",
+      "name": "Filter Invoice Emails",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "attachment_0",
+        "options": {}
+      },
+      "id": "e533f4e7-e86f-4f45-a550-77734ce02e39",
+      "name": "Extract Invoice Data",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        704,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.printify.com/v1/shops/<__PLACEHOLDER_VALUE__shop_id__>/orders.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fb79219d-7c61-4924-b2b1-9c059915f428",
+      "name": "Fetch Printify Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        928,
+        376
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "324dd272-bd68-4f7c-8523-b2505ea1b91a",
+      "name": "Combine Invoice Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1152,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an invoice comparison assistant. Compare the customer invoice with the Printify store invoice and identify: 1) Matching items and quantities, 2) Price discrepancies, 3) Missing or extra items, 4) Any billing errors. Provide a clear summary of findings and recommend next steps."
+        }
+      },
+      "id": "78f0765e-9208-4531-ab80-b5c6f6c21140",
+      "name": "Claude Invoice Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1376,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-3-5-sonnet-20241022"
+        },
+        "options": {}
+      },
+      "id": "bea51a7a-c3c0-4153-a510-844093742806",
+      "name": "Claude Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1384,
+        528
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"matchingItems\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"description\": \"Items that match between both invoices\"\n\t\t},\n\t\t\"discrepancies\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"description\": \"Price or quantity differences found\"\n\t\t},\n\t\t\"missingItems\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"description\": \"Items in customer invoice but not in Printify\"\n\t\t},\n\t\t\"extraItems\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"description\": \"Items in Printify but not in customer invoice\"\n\t\t},\n\t\t\"summary\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"Overall comparison summary\"\n\t\t},\n\t\t\"recommendedAction\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"Suggested next steps\"\n\t\t}\n\t},\n\t\"required\": [\"summary\", \"recommendedAction\"]\n}"
+      },
+      "id": "781266d8-8311-41c3-98bb-5c83a133fdfb",
+      "name": "Structure Response",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1512,
+        528
+      ]
+    }
+  ],
+  "connections": {
+    "Watch for Customer Emails": {
+      "main": [
+        [
+          {
+            "node": "Filter Invoice Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Invoice Emails": {
+      "main": [
+        [
+          {
+            "node": "Extract Invoice Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Invoice Data": {
+      "main": [
+        [
+          {
+            "node": "Fetch Printify Invoice",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Combine Invoice Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Printify Invoice": {
+      "main": [
+        [
+          {
+            "node": "Combine Invoice Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Invoice Data": {
+      "main": [
+        [
+          {
+            "node": "Claude Invoice Analyzer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Claude Invoice Analyzer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure Response": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Claude Invoice Analyzer",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
