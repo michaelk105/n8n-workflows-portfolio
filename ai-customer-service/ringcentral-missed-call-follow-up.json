@@ -1,0 +1,583 @@
+{
+  "name": "RingCentral Missed Call Follow-up",
+  "nodes": [
+    {
+      "id": "273b221c-d7dc-428d-be35-d98e380943a2",
+      "name": "RingCentral Missed Call Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        288
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ringcentral-missed-call",
+        "options": {}
+      }
+    },
+    {
+      "id": "ce083257-8644-4794-8c84-0e6d414fec5a",
+      "name": "Extract Call Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        288
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "callerPhone",
+              "type": "string",
+              "value": "={{ $json.body.body.parties[0].from.phoneNumber }}"
+            },
+            {
+              "id": "2",
+              "name": "callerName",
+              "type": "string",
+              "value": "={{ $json.body.body.parties[0].from.name || \"Unknown\" }}"
+            },
+            {
+              "id": "3",
+              "name": "callTime",
+              "type": "string",
+              "value": "={{ $json.body.body.parties[0].startTime }}"
+            },
+            {
+              "id": "4",
+              "name": "callId",
+              "type": "string",
+              "value": "={{ $json.body.body.telephonySessionId }}"
+            },
+            {
+              "id": "5",
+              "name": "callDirection",
+              "type": "string",
+              "value": "={{ $json.body.body.parties[0].direction }}"
+            },
+            {
+              "id": "6",
+              "name": "callStatus",
+              "type": "string",
+              "value": "={{ $json.body.body.parties[0].status.code }}"
+            },
+            {
+              "id": "7",
+              "name": "callReason",
+              "type": "string",
+              "value": "={{ $json.body.body.parties[0].status.reason }}"
+            },
+            {
+              "id": "8",
+              "name": "isMissedCall",
+              "type": "boolean",
+              "value": "={{ $json.body.body.parties[0].missedCall }}"
+            },
+            {
+              "id": "9",
+              "name": "dueTime",
+              "type": "string",
+              "value": "={{ $now.plus({ minutes: 15 }).toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f684bb55-56d7-40ba-aac3-616c466b0fbc",
+      "name": "Validate Missed Call",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        288
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.callDirection }}",
+              "rightValue": "Inbound",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $json.isMissedCall }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9dd917d5-4701-4772-a3f2-123ef6514439",
+      "name": "Check Opt-Out List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "SMS_Suppression_List"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone_number",
+              "lookupValue": "={{ $json.callerPhone }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ffac19a1-b437-4dd9-bab4-b33d1f7186f3",
+      "name": "Is Number Opted Out?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.phone_number }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "75afbbcd-9944-4462-af0d-ed3ed90ebefe",
+      "name": "Send SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        96
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__RingCentral SMS API endpoint__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"from\": { \"phoneNumber\": \"+1234567890\" }, \"to\": [{ \"phoneNumber\": $('Extract Call Data').item.json.callerPhone }], \"text\": \"Hi, sorry we missed your call. Thanks for reaching out to [Company Name]. A member of our leasing team will follow up with you shortly. Reply here if you'd like to share what you're looking for. Reply STOP to opt out.\" } }}",
+        "options": {}
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "29788034-d9f1-4fc9-8f3d-a3a25832ffec",
+      "name": "Alert Admin - SMS Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        336
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@company.com__>",
+        "subject": "=⚠️ RingCentral SMS Failed - {{ $(\"Extract Call Data\").item.json.callerPhone }}",
+        "message": "=<h3>SMS Send Failed</h3><p><strong>Caller:</strong> {{ $(\"Extract Call Data\").item.json.callerName }} ({{ $(\"Extract Call Data\").item.json.callerPhone }})</p><p><strong>Call Time:</strong> {{ $(\"Extract Call Data\").item.json.callTime }}</p><p><strong>Error:</strong> {{ $json.message || \"Unknown error\" }}</p>",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "ac5158ca-45a2-41c0-9454-9d3964f175cb",
+      "name": "Add Opt-Out Note",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        336
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "callerPhone",
+              "type": "string",
+              "value": "={{ $('Extract Call Data').item.json.callerPhone }}"
+            },
+            {
+              "id": "2",
+              "name": "callerName",
+              "type": "string",
+              "value": "={{ $('Extract Call Data').item.json.callerName }}"
+            },
+            {
+              "id": "3",
+              "name": "callTime",
+              "type": "string",
+              "value": "={{ $('Extract Call Data').item.json.callTime }}"
+            },
+            {
+              "id": "4",
+              "name": "callId",
+              "type": "string",
+              "value": "={{ $('Extract Call Data').item.json.callId }}"
+            },
+            {
+              "id": "5",
+              "name": "dueTime",
+              "type": "string",
+              "value": "={{ $('Extract Call Data').item.json.dueTime }}"
+            },
+            {
+              "id": "6",
+              "name": "note",
+              "type": "string",
+              "value": "SMS skipped - opted out"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "44fd6654-657b-4749-b093-33f2d687b4ed",
+      "name": "Ignore Non-Missed Call",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        672,
+        384
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "9e71802f-0d56-4e49-9336-5d6d25102d32",
+      "name": "Merge Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1344,
+        144
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "3e8004ca-66e4-4a5b-a78d-e9ce711d86e0",
+      "name": "Create Callback Task",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1568,
+        144
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "e0b2fc3e-f0ce-426f-8265-e6cd95d84c59",
+      "name": "Notify Leasing Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1792,
+        96
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=🚨 *Missed Call Alert*\n\n*Caller:* {{ $(\"Extract Call Data\").item.json.callerName }} ({{ $(\"Extract Call Data\").item.json.callerPhone }})\n*Time:* {{ $(\"Extract Call Data\").item.json.callTime }}\n*Call ID:* {{ $(\"Extract Call Data\").item.json.callId }}\n\n✅ Callback task created\n⏰ *Due within 15 minutes*",
+        "otherOptions": {}
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "dd9c21e0-2c56-4beb-bff0-ca62e42af62a",
+      "name": "Workflow Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "ded8b792-9cf1-4ce2-9cb1-9bc2b4498659",
+      "name": "Alert Admin - Task Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        288
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@company.com__>",
+        "subject": "=⚠️ Callback Task Creation Failed - {{ $(\"Extract Call Data\").item.json.callerPhone }}",
+        "message": "=<h3>Task Creation Failed</h3><p><strong>Caller:</strong> {{ $(\"Extract Call Data\").item.json.callerName }} ({{ $(\"Extract Call Data\").item.json.callerPhone }})</p><p><strong>Call Time:</strong> {{ $(\"Extract Call Data\").item.json.callTime }}</p><p><strong>Error:</strong> {{ $json.message || \"Unknown error\" }}</p>",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "daeb6aad-012d-4c7d-b769-257ed1cb87b7",
+      "name": "Alert Admin - Notification Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        192
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@company.com__>",
+        "subject": "=⚠️ Team Notification Failed - {{ $(\"Extract Call Data\").item.json.callerPhone }}",
+        "message": "=<h3>Team Notification Failed</h3><p><strong>Caller:</strong> {{ $(\"Extract Call Data\").item.json.callerName }} ({{ $(\"Extract Call Data\").item.json.callerPhone }})</p><p><strong>Call Time:</strong> {{ $(\"Extract Call Data\").item.json.callTime }}</p><p><strong>Error:</strong> {{ $json.message || \"Unknown error\" }}</p>",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "RingCentral Missed Call Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Call Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Call Data": {
+      "main": [
+        [
+          {
+            "node": "Validate Missed Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Missed Call": {
+      "main": [
+        [
+          {
+            "node": "Check Opt-Out List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignore Non-Missed Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Opt-Out List": {
+      "main": [
+        [
+          {
+            "node": "Is Number Opted Out?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Number Opted Out?": {
+      "main": [
+        [
+          {
+            "node": "Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add Opt-Out Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS": {
+      "main": [
+        [
+          {
+            "node": "Merge Paths",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Admin - SMS Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Opt-Out Note": {
+      "main": [
+        [
+          {
+            "node": "Merge Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Paths": {
+      "main": [
+        [
+          {
+            "node": "Create Callback Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Callback Task": {
+      "main": [
+        [
+          {
+            "node": "Notify Leasing Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Admin - Task Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Leasing Team": {
+      "main": [
+        [
+          {
+            "node": "Workflow Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Admin - Notification Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

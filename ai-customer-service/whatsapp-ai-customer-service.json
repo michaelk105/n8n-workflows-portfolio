@@ -1,0 +1,2195 @@
+{
+  "name": "WhatsApp AI Customer Service",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "id": "62777dd6-5072-455d-8702-b007e926008f",
+      "name": "WhatsApp Customer Message",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        552
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this WhatsApp message and classify the customer intent.\n\nMessage: {{ $json.messageBody }}\n\nClassify into one of these intents:\n- order_inquiry: Questions about existing orders\n- support: General support questions\n- report_request: Customer wants a report or complex analysis\n- other: Anything else\n\nSet needsEscalation to true if:\n- Intent is report_request\n- Customer is frustrated or angry\n- Request is too complex for automated response\n\nExtract any order IDs, product names, or relevant data mentioned.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a customer service intent classifier. Analyze messages accurately and extract relevant data."
+        }
+      },
+      "id": "7748ddad-cde1-4f17-84d8-70f4e5f0bbae",
+      "name": "Classify Customer Intent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1728,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": {
+          "intent": "order_inquiry",
+          "confidence": 0.95,
+          "needsEscalation": false,
+          "extractedData": {
+            "orderId": "12345"
+          }
+        }
+      },
+      "id": "7f85e295-1dc3-4dd1-bc06-d0fe26aa2a54",
+      "name": "Intent Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1864,
+        1064
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.needsEscalation }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Escalate to Human"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "order_inquiry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Fetch Order"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "General Response"
+        }
+      },
+      "id": "7d3a6419-b560-40d9-9b0c-29d433ca7910",
+      "name": "Route by Escalation",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2528,
+        824
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "<__PLACEHOLDER_VALUE__Your WhatsApp Business Phone Number ID__>",
+        "recipientPhoneNumber": "={{ $json.customerPhone }}",
+        "textBody": "={{ $json.response }}",
+        "additionalFields": {}
+      },
+      "id": "07eb306e-615d-4cb4-a962-37e12c246d55",
+      "name": "Send WhatsApp Response",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        5024,
+        580
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.printify.com/v1/shops/{{ $json.extractedData.shopId ?? \"YOUR_SHOP_ID\" }}/orders/{{ $json.extractedData.orderId }}.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "1f8ee634-9343-4416-b98a-fcd2a52396ed",
+      "name": "Fetch Printify Order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3424,
+        772
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Generate a friendly WhatsApp response about this order.\n\nCustomer Message: {{ $(\"Fetch Printify Order\").item.json.messageBody ?? \"order inquiry\" }}\n\nOrder Data: {{ $json }}\n\nProvide helpful information about the order status, items, and shipping. Keep it concise and friendly.",
+        "options": {
+          "systemMessage": "You are a helpful customer service agent for an e-commerce store. Provide clear, friendly responses about orders."
+        }
+      },
+      "id": "e2b8af81-8a7c-4403-bb04-409e7e7ebe2e",
+      "name": "Generate Order Response",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        3872,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response",
+              "name": "response",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $json.customerPhone }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c1cd788-2c1d-43a0-b69e-ee95e3714393",
+      "name": "Prepare Order Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4288,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Generate a helpful WhatsApp response to this customer message.\n\nCustomer Message: {{ $json.messageBody }}\n\nIntent: {{ $json.intent }}\n\nProvide a helpful, friendly response. Keep it concise for WhatsApp.",
+        "options": {
+          "systemMessage": "You are a helpful customer service agent. Provide clear, friendly responses to customer inquiries."
+        }
+      },
+      "id": "7cfb6ac3-72b9-4553-9b4a-c424a116e1f0",
+      "name": "Generate General Response",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        4224,
+        1252
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response",
+              "name": "response",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $json.customerPhone }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f9ae96d4-9835-451e-af71-ceb3d67f835c",
+      "name": "Prepare General Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4576,
+        1252
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customerPhone": "={{ $json.customerPhone }}",
+            "messageContent": "={{ $json.messageBody }}",
+            "detectedIntent": "={{ $json.intent }}",
+            "needsEscalation": "={{ $json.needsEscalation }}",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "7983c873-8adb-4e56-adc1-c5ab023998c1",
+      "name": "Log Customer Request",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2304,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const timestamp = Date.now();\nconst random = Math.random().toString(36).substring(2, 8).toUpperCase();\nconst ticketId = `TCK-${timestamp}-${random}`;\n\nreturn {\n  ticketId,\n  customerPhone: $input.item.json.customerPhone,\n  customerMessage: $input.item.json.messageBody,\n  intent: $input.item.json.intent,\n  status: \"OPEN\",\n  timestamp: new Date().toISOString(),\n  isNewTicket: true\n};"
+      },
+      "id": "8a879185-4eaa-4911-92fc-1082efbfd920",
+      "name": "Generate Ticket ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3200,
+        376
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticketId": "={{ $json.ticketId }}",
+            "customerPhone": "={{ $json.customerPhone }}",
+            "customerMessage": "={{ $json.customerMessage }}",
+            "intent": "={{ $json.intent }}",
+            "status": "={{ $json.status }}",
+            "timestamp": "={{ $json.timestamp }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "2f71e23f-df95-464a-bc7e-5a9d150fea37",
+      "name": "Create Ticket Record",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3648,
+        376
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "<__PLACEHOLDER_VALUE__Your Telegram Chat ID or @channel_name__>",
+        "text": "=🚨 *New Escalation Ticket*\n\n*Ticket ID:* {{ $json.ticketId }}\n*Customer:* {{ $json.customerPhone }}\n*Type:* {{ $json.intent }}\n*Message:*\n{{ $json.customerMessage }}\n\n_Reply with ticket ID to respond_",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "2d7db984-4c06-4581-bc05-5956de1f01a3",
+      "name": "Notify Staff",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4288,
+        308
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response",
+              "name": "response",
+              "value": "=Your request has been received. Ticket ID: {{ $json.ticketId }}. A human agent will respond shortly.",
+              "type": "string"
+            },
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $json.customerPhone }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b7d852d6-c722-4536-8fd9-fc9fdda843ad",
+      "name": "Prepare Escalation Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4576,
+        308
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "staff-reply",
+        "options": {
+          "noResponseBody": false,
+          "responseData": "={{ { \"success\": true, \"message\": \"Reply sent to customer\" } }}"
+        }
+      },
+      "id": "03972f22-7e1f-43a6-b9f9-a3e10f5cdc6f",
+      "name": "Staff Reply Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -64,
+        1668
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "ticketId",
+              "keyValue": "={{ $json.ticketId }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "c708f738-5353-45f9-be51-25e5c872a4af",
+      "name": "Find Ticket",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        608,
+        1572
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.customerPhone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "23a079fa-b9e8-49bd-9666-501b1be23fb0",
+      "name": "Check Ticket Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        832,
+        1572
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "ticketId",
+              "keyValue": "={{ $json.ticketId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "RESOLVED"
+          }
+        },
+        "options": {}
+      },
+      "id": "1fac2de6-9438-405c-b242-1d11db7871b6",
+      "name": "Update Ticket Status",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1056,
+        1476
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $json.customerPhone }}",
+              "type": "string"
+            },
+            {
+              "id": "response",
+              "name": "response",
+              "value": "={{ $json.staffReply }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a135ae81-fab5-46ca-ab3a-5194882c43d5",
+      "name": "Prepare Customer Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1280,
+        1476
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "<__PLACEHOLDER_VALUE__Your WhatsApp Business Phone Number ID__>",
+        "recipientPhoneNumber": "={{ $json.customerPhone }}",
+        "textBody": "={{ $json.response }}",
+        "additionalFields": {}
+      },
+      "id": "1abfa709-d9db-4378-8cd8-3330c2e4b1fe",
+      "name": "Send Staff Reply to Customer",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1504,
+        1476
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "90ac5ff7-0283-4918-bdde-e102c47bd4fe",
+      "name": "Error Workflow Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        1988
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "errorMessage": "={{ $json.error.message }}",
+            "executionId": "={{ $json.execution.id }}",
+            "timestamp": "={{ $now.toISO() }}",
+            "workflowName": "WhatsApp AI Support"
+          }
+        },
+        "options": {}
+      },
+      "id": "ac9634e8-6f76-4f55-bf4c-36168ec7e039",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        160,
+        1988
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Staff Reply System\n\n**Webhook:** POST /staff-reply\n\n**Payload:**\n```json\n{\n  \"ticketId\": \"TCK-xxx\",\n  \"staffReply\": \"message\"\n}\n```\n\n**Flexible Ticket ID:**\n- TCK-12345-ABC\n- 12345\n- \"Ticket 12345\"\n\n**Validations:**\n- Missing ticket ID → notify staff\n- Ticket not found → notify staff\n- Auto-updates status to RESOLVED",
+        "height": 360,
+        "width": 400,
+        "color": 5
+      },
+      "id": "0b395fb6-9ef3-4e53-b333-038ee633d02a",
+      "name": "Sticky Note staff",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Error Handling\n\n**WhatsApp Send Failures:**\n- Logged to database\n- Error output captured\n\n**API Failures:**\n- Escalates to human\n- Customer notified\n\n**Global Errors:**\n- Error trigger logs all failures\n- Manual intervention flagged",
+        "height": 280,
+        "width": 400,
+        "color": 6
+      },
+      "id": "13f28900-3409-452d-986d-4194366984a5",
+      "name": "Sticky Note error",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        1392
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "note",
+              "name": "note",
+              "value": "Error logged - manual intervention required",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5a95bc33-7cbf-444c-a31c-1ac3efb0fc37",
+      "name": "Send Error Fallback",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        384,
+        1988
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $json.entry[0].changes[0].value.messages[0].from }}",
+              "type": "string"
+            },
+            {
+              "id": "messageBody",
+              "name": "messageBody",
+              "value": "={{ $json.entry[0].changes[0].value.messages[0].text.body }}",
+              "type": "string"
+            },
+            {
+              "id": "messageTimestamp",
+              "name": "messageTimestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "69103425-36a3-4970-a10b-05ff8913ff79",
+      "name": "Extract Customer Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        160,
+        552
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customerPhone",
+              "keyValue": "={{ $json.customerPhone }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "orderBy": true
+      },
+      "id": "02fe7f74-1e18-4bd2-a076-549612cec4be",
+      "name": "Check for Spam",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        384,
+        552
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const currentTime = new Date($input.item.json.messageTimestamp);\nconst lastMessageTime = $input.item.json.timestamp ? new Date($input.item.json.timestamp) : null;\n\nif (lastMessageTime) {\n  const timeDiff = (currentTime - lastMessageTime) / 1000;\n  if (timeDiff < 15) {\n    return { isSpam: true, timeDiff, customerPhone: $input.item.json.customerPhone };\n  }\n}\n\nreturn { isSpam: false, customerPhone: $input.item.json.customerPhone, messageBody: $input.item.json.messageBody };"
+      },
+      "id": "f11bcba6-ecb0-49c7-9de1-4b1739d82cb8",
+      "name": "Detect Spam Burst",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        552
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isSpam }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e242b6aa-9a2e-4536-9d1f-282678555da1",
+      "name": "Filter Spam Messages",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        832,
+        552
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customerPhone",
+              "keyValue": "={{ $json.customerPhone }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "OPEN"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "f7dae21e-396c-4c11-bd2d-2eb2d9cf593c",
+      "name": "Check for Open Ticket",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1056,
+        552
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ticketId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ab5454b5-2267-4b18-9c7c-408848465887",
+      "name": "Has Open Ticket?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1280,
+        552
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $json.customerPhone }}",
+              "type": "string"
+            },
+            {
+              "id": "response",
+              "name": "response",
+              "value": "=You already have an open ticket ({{ $json.ticketId ?? \"pending\" }}). A human agent will respond shortly.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6be3cddc-06e6-4166-b215-da03368a96ba",
+      "name": "Respond Ticket Pending",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4576,
+        16
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a84efba1-ca9d-4882-b593-52fc1feedaa1",
+      "name": "Merge All Responses",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4800,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const message = $input.item.json.messageBody.toLowerCase();\nconst escalationKeywords = [\"refund\", \"broken\", \"complaint\", \"not working\", \"defective\", \"damaged\", \"angry\", \"terrible\", \"worst\"];\n\nconst hasEscalationKeyword = escalationKeywords.some(keyword => message.includes(keyword));\n\nreturn {\n  customerPhone: $input.item.json.customerPhone,\n  messageBody: $input.item.json.messageBody,\n  forceEscalation: hasEscalationKeyword\n};"
+      },
+      "id": "149f68bc-300c-461e-91b3-33940fa7c4be",
+      "name": "Check Keyword Override",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $(\"Check Keyword Override\").item.json.customerPhone }}",
+              "type": "string"
+            },
+            {
+              "id": "messageBody",
+              "name": "messageBody",
+              "value": "={{ $(\"Check Keyword Override\").item.json.messageBody }}",
+              "type": "string"
+            },
+            {
+              "id": "intent",
+              "name": "intent",
+              "value": "={{ $json.output.intent }}",
+              "type": "string"
+            },
+            {
+              "id": "needsEscalation",
+              "name": "needsEscalation",
+              "value": "={{ $(\"Check Keyword Override\").item.json.forceEscalation || $json.output.needsEscalation }}",
+              "type": "boolean"
+            },
+            {
+              "id": "extractedData",
+              "name": "extractedData",
+              "value": "={{ $json.output.extractedData }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3c3e5571-b03e-47a0-a183-e7e09485b926",
+      "name": "Merge Intent Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2080,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customerPhone",
+              "keyValue": "={{ $json.customerPhone }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "OPEN"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "69a1abf1-5591-47e5-b1e2-20c2d8c43e92",
+      "name": "Check Duplicate Ticket",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2752,
+        308
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ticketId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1b33c8aa-d09b-438e-9f31-34fdd6bb7dbb",
+      "name": "Ticket Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2976,
+        308
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ticketId",
+              "name": "ticketId",
+              "value": "={{ $json.ticketId ?? \"TCK-UNKNOWN\" }}",
+              "type": "string"
+            },
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $(\"Check Duplicate Ticket\").item.json.customerPhone }}",
+              "type": "string"
+            },
+            {
+              "id": "customerMessage",
+              "name": "customerMessage",
+              "value": "={{ $(\"Check Duplicate Ticket\").item.json.messageBody }}",
+              "type": "string"
+            },
+            {
+              "id": "intent",
+              "name": "intent",
+              "value": "={{ $(\"Check Duplicate Ticket\").item.json.intent }}",
+              "type": "string"
+            },
+            {
+              "id": "isNewTicket",
+              "name": "isNewTicket",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "42354703-eaaf-4b80-9205-96f757aaa8e7",
+      "name": "Reuse Existing Ticket",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3648,
+        184
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "9cb5e415-cd3b-4909-9e80-12eacf4c678f",
+      "name": "Merge Ticket Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3936,
+        308
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isNewTicket }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5963a363-fce9-4e8c-b01b-a9bf3dc2276d",
+      "name": "Should Create Ticket?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3424,
+        376
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.extractedData.orderId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ecfbc306-1f24-49c5-a32f-7b8d1b1a9449",
+      "name": "Validate Order ID",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3200,
+        868
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "917315c0-aaac-42a1-922a-238006ffd4a8",
+      "name": "Check API Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3648,
+        772
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "94c17703-20bc-4455-a81a-81fbebf1caa1",
+      "name": "Merge Order Responses",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4576,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $json.customerPhone }}",
+              "type": "string"
+            },
+            {
+              "id": "response",
+              "name": "response",
+              "value": "We are having trouble accessing order data. A human agent will assist you.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ed2b15eb-cc12-46e7-a591-9e078943fe05",
+      "name": "Escalate API Failure",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4288,
+        868
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $json.customerPhone }}",
+              "type": "string"
+            },
+            {
+              "id": "response",
+              "name": "response",
+              "value": "Please provide your order ID so I can assist you.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3e29e92e-fe4a-4371-804c-05bd7b5371a2",
+      "name": "Request Order ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4288,
+        1060
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "error",
+              "name": "error",
+              "value": "WhatsApp send failed",
+              "type": "string"
+            },
+            {
+              "id": "customerPhone",
+              "name": "customerPhone",
+              "value": "={{ $json.customerPhone }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "52fb84ad-510a-434f-8597-dbd25f706821",
+      "name": "Handle Send Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5248,
+        484
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customerPhone": "={{ $json.customerPhone }}",
+            "outcome": "send_failed",
+            "errorMessage": "={{ $json.error }}",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "789f79ed-1b5f-45a0-bf73-26aff7fdb5bb",
+      "name": "Log Send Error",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5472,
+        484
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customerPhone": "={{ $json.customerPhone }}",
+            "outcome": "message_sent",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "062c1b16-b962-4de6-b7f3-dec8d7dff486",
+      "name": "Log Send Success",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5248,
+        676
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const rawTicketId = $input.item.json.body.ticketId || \"\";\nconst staffReply = $input.item.json.body.staffReply || \"\";\n\nlet ticketId = null;\n\nconst tckPattern = /TCK-\\d+-[A-Z0-9]+/i;\nconst numPattern = /\\b\\d{10,}\\b/;\n\nif (tckPattern.test(rawTicketId)) {\n  ticketId = rawTicketId.match(tckPattern)[0].toUpperCase();\n} else if (numPattern.test(rawTicketId)) {\n  const num = rawTicketId.match(numPattern)[0];\n  ticketId = `TCK-${num}`;\n} else {\n  const combined = rawTicketId + \" \" + staffReply;\n  if (tckPattern.test(combined)) {\n    ticketId = combined.match(tckPattern)[0].toUpperCase();\n  }\n}\n\nreturn {\n  ticketId,\n  staffReply,\n  rawInput: rawTicketId\n};"
+      },
+      "id": "cd3743be-8458-40f4-827e-c6afe983b42c",
+      "name": "Parse Ticket ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        1668
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ticketId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9c6465b2-35ce-4ce4-9ce0-1d4aa7c0fedb",
+      "name": "Validate Ticket ID",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        384,
+        1668
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticketId": "={{ $(\"Update Ticket Status\").item.json.ticketId }}",
+            "customerPhone": "={{ $json.customerPhone }}",
+            "outcome": "staff_reply_sent",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "50646f4d-0fde-40d5-b83d-bb8960671806",
+      "name": "Log Staff Reply",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1728,
+        1476
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "<__PLACEHOLDER_VALUE__Your Telegram Chat ID or @channel_name__>",
+        "text": "=⚠️ Ticket not found: {{ $json.ticketId }}. Please verify the ID.",
+        "additionalFields": {}
+      },
+      "id": "f30d794b-255f-4fb8-8377-b8a44ef97088",
+      "name": "Notify Ticket Not Found",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1056,
+        1668
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "<__PLACEHOLDER_VALUE__Your Telegram Chat ID or @channel_name__>",
+        "text": "⚠️ Please include Ticket ID (e.g., TCK-12345) in your reply.",
+        "additionalFields": {}
+      },
+      "id": "23e20559-3f9f-49ba-9087-1547cd8e45d3",
+      "name": "Notify Missing Ticket ID",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        608,
+        1764
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "2fdb9583-4e4a-4f9c-a5ad-66b5ec4f4147",
+      "name": "Stale Ticket Monitor",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -64,
+        2212
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const hoursThreshold = 24;\\nconst cutoffTime = new Date(Date.now() - hoursThreshold * 60 * 60 * 1000);\\n\\nreturn {\\n  cutoffTime: cutoffTime.toISOString(),\\n  hoursThreshold\\n};"
+      },
+      "id": "511c3c71-8d8d-4ec8-b522-a1ac3670bf2a",
+      "name": "Find Stale Tickets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        2212
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "keyValue": "OPEN"
+            },
+            {
+              "keyName": "timestamp",
+              "condition": "lt",
+              "keyValue": "={{ $json.cutoffTime }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "346d02cc-ac53-42e6-9b57-ea6dc24545f7",
+      "name": "Query Stale Tickets",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        384,
+        2212
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "chatId": "<__PLACEHOLDER_VALUE__Your Telegram Chat ID or @channel_name__>",
+        "text": "=⏰ *Reminder: Stale Ticket*\\n\\n*Ticket ID:* {{ $json.ticketId }}\\n*Customer:* {{ $json.customerPhone }}\\n*Age:* {{ $json.timestamp }}\\n\\n_This ticket is still OPEN_",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "1cf716c0-8c55-4047-82e7-7fe0d996a954",
+      "name": "Notify Stale Tickets",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        608,
+        2212
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Production WhatsApp AI Support\n\n**Anti-Spam:**\n- Detects message bursts (<15s)\n- Prevents duplicate processing\n\n**Smart Routing:**\n- Keyword override for escalation\n- Validates order IDs before API calls\n- Handles API failures gracefully\n\n**Ticket Management:**\n- Prevents duplicate tickets\n- Reuses open tickets\n- Flexible ticket ID parsing\n\n**Monitoring:**\n- Stale ticket alerts every 6 hours",
+        "height": 360,
+        "width": 600,
+        "color": 2
+      },
+      "id": "1c207c05-978f-4d29-8897-380f32705ff8",
+      "name": "Sticky Note main",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Setup Required\n\n**Credentials:**\n1. WhatsApp Business Cloud\n2. OpenRouter API Key (for DeepSeek)\n3. Printify API token\n4. Telegram Bot\n\n**AI Model:**\n- Provider: OpenRouter\n- Model: deepseek/deepseek-chat\n- Base URL: https://openrouter.ai/api/v1\n\n**Data Tables:**\n1. Tickets (ticketId, customerPhone, customerMessage, intent, status, timestamp)\n2. Request Logs (customerPhone, messageContent, detectedIntent, needsEscalation, timestamp)\n3. Error Logs (errorMessage, executionId, timestamp, workflowName)\n\n**Placeholders:**\n- WhatsApp Phone Number ID\n- Telegram Chat ID\n- Printify Shop ID",
+        "height": 520,
+        "width": 400,
+        "color": 4
+      },
+      "id": "7b6731b9-79e1-47eb-bdf5-8db208f92bef",
+      "name": "Sticky Note setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        5200,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Stale Ticket Monitor\n\n**Schedule:** Every 6 hours\n\n**Logic:**\n- Finds tickets OPEN > 24 hours\n- Sends reminder to staff\n- Helps prevent forgotten tickets",
+        "height": 200,
+        "width": 400,
+        "color": 3
+      },
+      "id": "5894ffec-da28-4867-b8e8-b3d43d21ec76",
+      "name": "Sticky Note stale",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        1728
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "deepseek/deepseek-chat"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "83f4651e-485a-4185-85fe-9a31b0f7d719",
+      "name": "DeepSeek Intent Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1736,
+        1064
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "deepseek/deepseek-chat"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "id": "feb9b516-d3c7-4a5e-a51d-6c7e23d5075b",
+      "name": "DeepSeek Response Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        3944,
+        844
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WhatsApp Customer Message": {
+      "main": [
+        [
+          {
+            "node": "Extract Customer Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Customer Intent": {
+      "main": [
+        [
+          {
+            "node": "Merge Intent Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Classify Customer Intent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Escalation": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Order ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate General Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Printify Order": {
+      "main": [
+        [
+          {
+            "node": "Check API Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Order Response": {
+      "main": [
+        [
+          {
+            "node": "Prepare Order Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Order Response": {
+      "main": [
+        [
+          {
+            "node": "Merge Order Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate General Response": {
+      "main": [
+        [
+          {
+            "node": "Prepare General Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare General Response": {
+      "main": [
+        [
+          {
+            "node": "Merge All Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Customer Request": {
+      "main": [
+        [
+          {
+            "node": "Route by Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Ticket ID": {
+      "main": [
+        [
+          {
+            "node": "Should Create Ticket?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Ticket Record": {
+      "main": [
+        [
+          {
+            "node": "Merge Ticket Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Staff": {
+      "main": [
+        [
+          {
+            "node": "Prepare Escalation Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Escalation Response": {
+      "main": [
+        [
+          {
+            "node": "Merge All Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Staff Reply Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Ticket ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Ticket": {
+      "main": [
+        [
+          {
+            "node": "Check Ticket Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Ticket Found": {
+      "main": [
+        [
+          {
+            "node": "Update Ticket Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Ticket Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Ticket Status": {
+      "main": [
+        [
+          {
+            "node": "Prepare Customer Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Customer Reply": {
+      "main": [
+        [
+          {
+            "node": "Send Staff Reply to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error": {
+      "main": [
+        [
+          {
+            "node": "Send Error Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Customer Data": {
+      "main": [
+        [
+          {
+            "node": "Check for Spam",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Spam": {
+      "main": [
+        [
+          {
+            "node": "Detect Spam Burst",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Spam Burst": {
+      "main": [
+        [
+          {
+            "node": "Filter Spam Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Spam Messages": {
+      "main": [
+        [
+          {
+            "node": "Check for Open Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Open Ticket": {
+      "main": [
+        [
+          {
+            "node": "Has Open Ticket?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Open Ticket?": {
+      "main": [
+        [
+          {
+            "node": "Respond Ticket Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Keyword Override",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Ticket Pending": {
+      "main": [
+        [
+          {
+            "node": "Merge All Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Responses": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Keyword Override": {
+      "main": [
+        [
+          {
+            "node": "Classify Customer Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Intent Data": {
+      "main": [
+        [
+          {
+            "node": "Log Customer Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Ticket": {
+      "main": [
+        [
+          {
+            "node": "Ticket Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ticket Exists?": {
+      "main": [
+        [
+          {
+            "node": "Reuse Existing Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Ticket ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reuse Existing Ticket": {
+      "main": [
+        [
+          {
+            "node": "Merge Ticket Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Ticket Paths": {
+      "main": [
+        [
+          {
+            "node": "Notify Staff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Create Ticket?": {
+      "main": [
+        [
+          {
+            "node": "Create Ticket Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Order ID": {
+      "main": [
+        [
+          {
+            "node": "Fetch Printify Order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Request Order ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check API Success": {
+      "main": [
+        [
+          {
+            "node": "Generate Order Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Escalate API Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Order Responses": {
+      "main": [
+        [
+          {
+            "node": "Merge All Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate API Failure": {
+      "main": [
+        [
+          {
+            "node": "Merge Order Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Order ID": {
+      "main": [
+        [
+          {
+            "node": "Merge Order Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Response": {
+      "main": [
+        [
+          {
+            "node": "Log Send Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Handle Send Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Send Error": {
+      "main": [
+        [
+          {
+            "node": "Log Send Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Ticket ID": {
+      "main": [
+        [
+          {
+            "node": "Validate Ticket ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Ticket ID": {
+      "main": [
+        [
+          {
+            "node": "Find Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Missing Ticket ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Staff Reply to Customer": {
+      "main": [
+        [
+          {
+            "node": "Log Staff Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stale Ticket Monitor": {
+      "main": [
+        [
+          {
+            "node": "Find Stale Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Stale Tickets": {
+      "main": [
+        [
+          {
+            "node": "Query Stale Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Stale Tickets": {
+      "main": [
+        [
+          {
+            "node": "Notify Stale Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Intent Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify Customer Intent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Response Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Order Response",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Generate General Response",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

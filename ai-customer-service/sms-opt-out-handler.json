@@ -1,0 +1,288 @@
+{
+  "name": "SMS Opt-Out Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ringcentral-inbound-sms",
+        "options": {}
+      },
+      "id": "7ae585e0-48dd-4472-bcbe-331ba6e3fba7",
+      "name": "RingCentral Inbound SMS",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -48,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const root = $input.first().json;\n// Webhook wraps the request payload under \"body\"; RingCentral nests the message under \"body\" too.\nconst envelope = root.body || root;\nconst msg = envelope.body || envelope;\n\nconst phone_number =\n  (msg.from && msg.from.phoneNumber) ||\n  (typeof msg.from === 'string' ? msg.from : '') ||\n  (envelope.from && envelope.from.phoneNumber) ||\n  '';\n\nconst message_text =\n  msg.subject || msg.text || msg.message || envelope.subject || '';\n\nconst keywords = ['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'];\nconst normalized = String(message_text || '').trim().toUpperCase();\nconst is_opt_out = keywords.indexOf(normalized) !== -1;\n\nreturn [{ json: { phone_number, message_text, normalized, is_opt_out } }];"
+      },
+      "id": "e08b7e21-81b0-4843-a720-6ef1c4c388d3",
+      "name": "Extract Message Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "is-opt-out",
+              "leftValue": "={{ $json.is_opt_out }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2be7f6bb-7680-434d-8efc-f64773fa72bf",
+      "name": "Is Opt-Out Request?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "Select the SMS suppression spreadsheet"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "SMS_Suppression_List"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "phone_number": "={{ $json.phone_number }}",
+            "opted_out_date": "={{ $now.toISO() }}",
+            "source": "SMS reply"
+          },
+          "schema": [
+            {
+              "id": "phone_number",
+              "displayName": "phone_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "opted_out_date",
+              "displayName": "opted_out_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "86e1478f-56fa-4e16-bef8-ef700ea8620c",
+      "name": "Add to Suppression List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        624,
+        112
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "from-number",
+              "name": "from_number",
+              "value": "<__PLACEHOLDER_VALUE__Your RingCentral SMS-enabled number in E.164 format, e.g. +14155551234__>",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "4f9149e0-49fe-478c-94d1-acbf92f96fd6",
+      "name": "Set SMS Sender",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        848,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://platform.ringcentral.com/restapi/v1.0/account/~/extension/~/sms",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"from\": { \"phoneNumber\": \"{{ $json.from_number }}\" }, \"to\": [{ \"phoneNumber\": \"{{ $json.phone_number }}\" }], \"text\": \"You have been unsubscribed and will receive no further messages.\" }",
+        "options": {}
+      },
+      "id": "48282b6a-8fd4-4660-9fa6-371bf7d9ca30",
+      "name": "Send Confirmation SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1072,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin email address for opt-out notifications__>",
+        "subject": "Opt-Out Recorded",
+        "emailType": "text",
+        "message": "=An SMS opt-out was processed and recorded.\n\nPhone number: {{ $(\"Extract Message Data\").item.json.phone_number }}\nMessage: {{ $(\"Extract Message Data\").item.json.message_text }}\nRecorded at: {{ $now.toISO() }}\nSource: SMS reply",
+        "options": {}
+      },
+      "id": "b803c8b3-6faf-4b05-ba89-3049fe7245d7",
+      "name": "Notify Admin - Opt-Out Recorded",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1296,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin email address for opt-out notifications__>",
+        "subject": "ALERT: SMS Opt-Out Logging Failed",
+        "emailType": "text",
+        "message": "=An SMS opt-out could NOT be written to the suppression list. Manual action is required to suppress this number.\n\nPhone number: {{ $(\"Extract Message Data\").item.json.phone_number }}\nMessage: {{ $(\"Extract Message Data\").item.json.message_text }}\nError: {{ $json.error || $json.message || \"See execution log\" }}\nTime: {{ $now.toISO() }}",
+        "options": {}
+      },
+      "id": "f8cb9189-3aee-497c-ba6d-524970b2f885",
+      "name": "Alert Admin - Opt-Out Logging Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        208
+      ]
+    }
+  ],
+  "connections": {
+    "RingCentral Inbound SMS": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Data": {
+      "main": [
+        [
+          {
+            "node": "Is Opt-Out Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Opt-Out Request?": {
+      "main": [
+        [
+          {
+            "node": "Add to Suppression List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Suppression List": {
+      "main": [
+        [
+          {
+            "node": "Set SMS Sender",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Admin - Opt-Out Logging Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set SMS Sender": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmation SMS": {
+      "main": [
+        [
+          {
+            "node": "Notify Admin - Opt-Out Recorded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

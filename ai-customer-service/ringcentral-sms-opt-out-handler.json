@@ -1,0 +1,274 @@
+{
+  "name": "RingCentral SMS Opt-Out Handler",
+  "nodes": [
+    {
+      "id": "0f1a8518-9901-4c07-8799-9c368e9d3a9c",
+      "name": "RingCentral Inbound SMS",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ringcentral-inbound-sms",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "703c819c-0dfa-435e-869e-a747b07f9d83",
+      "name": "Extract Message Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "phone",
+              "name": "phone_number",
+              "type": "string",
+              "value": "={{ $json.body.body?.from?.phoneNumber ?? $json.body.from?.phoneNumber ?? $json.body.phoneNumber }}"
+            },
+            {
+              "id": "text",
+              "name": "message_text",
+              "type": "string",
+              "value": "={{ $json.body.body?.subject ?? $json.body.body?.text ?? $json.body.subject ?? $json.body.text }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "82149d73-2aee-4fdd-b8c9-5b7564ee3fbc",
+      "name": "Is Opt-Out Request?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "optout-match",
+              "leftValue": "={{ ['STOP','STOPALL','UNSUBSCRIBE','CANCEL','END','QUIT'].includes(String($json.message_text || '').trim().toUpperCase()) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0ec37c54-6198-4b79-9cb3-e81b5f19cc0c",
+      "name": "Add to Suppression List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "Select the SMS suppression spreadsheet"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "SMS_Suppression_List"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "phone_number": "={{ $json.phone_number }}",
+            "opted_out_date": "={{ $now.toISO() }}",
+            "source": "SMS reply"
+          },
+          "schema": [
+            {
+              "id": "phone_number",
+              "displayName": "phone_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "opted_out_date",
+              "displayName": "opted_out_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "59b33dda-632f-45cf-8005-aa2e25cdd439",
+      "name": "Send Confirmation SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://platform.ringcentral.com/restapi/v1.0/account/~/extension/~/sms",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": { \"phoneNumber\": \"{{ $json.smsFromNumber || 'RINGCENTRAL_FROM_NUMBER' }}\" },\n  \"to\": [ { \"phoneNumber\": \"{{ $('Extract Message Data').item.json.phone_number }}\" } ],\n  \"text\": \"You have been unsubscribed and will receive no further messages.\"\n}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api"
+      },
+      "credentials": {}
+    },
+    {
+      "id": "d2e3d39a-aa81-4c1a-aaa8-7b6c80504433",
+      "name": "Notify Admin - Opt-Out Recorded",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin email address__>",
+        "subject": "=SMS Opt-Out recorded: {{ $('Extract Message Data').item.json.phone_number }}",
+        "emailType": "text",
+        "message": "=The following number opted out via SMS reply and was added to the suppression list:\n\nPhone: {{ $('Extract Message Data').item.json.phone_number }}\nMessage: {{ $('Extract Message Data').item.json.message_text }}\nRecorded: {{ $now.toISO() }}",
+        "options": {}
+      },
+      "credentials": {}
+    },
+    {
+      "id": "8ae00141-6b94-4ac2-aaa2-42c93237c4c8",
+      "name": "Alert Admin - Opt-Out Logging Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin email address__>",
+        "subject": "=ALERT: Failed to log SMS opt-out for {{ $('Extract Message Data').item.json.phone_number }}",
+        "emailType": "text",
+        "message": "=A suppression-list append FAILED. This opt-out may not be recorded — handle manually immediately.\n\nPhone: {{ $('Extract Message Data').item.json.phone_number }}\nMessage: {{ $('Extract Message Data').item.json.message_text }}\nError: {{ $json.error?.message || $json.error || JSON.stringify($json) }}\nTime: {{ $now.toISO() }}",
+        "options": {}
+      },
+      "credentials": {}
+    }
+  ],
+  "connections": {
+    "RingCentral Inbound SMS": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Data": {
+      "main": [
+        [
+          {
+            "node": "Is Opt-Out Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Opt-Out Request?": {
+      "main": [
+        [
+          {
+            "node": "Add to Suppression List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Suppression List": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Admin - Opt-Out Logging Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmation SMS": {
+      "main": [
+        [
+          {
+            "node": "Notify Admin - Opt-Out Recorded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "tags": []
+}

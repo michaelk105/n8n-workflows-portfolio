@@ -1,0 +1,1283 @@
+{
+  "name": "AI Receptionist for Restaurant (GoHighLevel)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "restaurant-ai-receptionist",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "6865af89-f52d-4ed8-b89c-e1f0df2ebd87",
+      "name": "Incoming Call Not Answered",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Incoming Call Not Answered').item.json.body.customerMessage }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a friendly AI receptionist for a restaurant. Your job is to:\n\n1. Greet customers warmly and ask how you can help\n2. Handle four types of requests:\n   - FOOD ORDERS: Collect items one at a time, ask for modifications, get customer name and phone, read back the full order for confirmation\n   - RESERVATIONS: Collect name, date, time, party size, and special requests, then confirm details\n   - GENERAL QUESTIONS: Answer questions about hours, location, menu using this info:\n     * Hours: Mon-Thu 11am-10pm, Fri-Sat 11am-11pm, Sun 10am-9pm\n     * Location: 123 Main Street, Downtown\n     * Menu highlights: Italian cuisine, fresh pasta, wood-fired pizza, seasonal specials\n   - HUMAN HANDOFF: If customer asks to speak to someone or you cannot help, set needsHumanHandoff to true\n\n3. Always be polite, patient, and confirm details back to the customer\n4. Set conversationComplete to true only when the customer confirms their order/reservation or you have fully answered their question\n5. Populate the structured output fields based on the conversation:\n   - intent: \"order\", \"reservation\", \"question\", or \"handoff\"\n   - Fill relevant fields based on intent (orderItems, customerName, etc.)\n   - Set needsHumanHandoff to true if escalation needed\n   - Set conversationComplete to true when done",
+          "maxIterations": 15
+        }
+      },
+      "id": "4dda620b-4a08-482a-a1a9-16b199124260",
+      "name": "AI Receptionist",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        528,
+        480
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "4acda9b3-ad2c-473c-b761-99bdf8e8ed55",
+      "name": "OpenAI GPT Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        688
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Incoming Call Not Answered').item.json.body.callSid }}",
+        "contextWindowLength": 10
+      },
+      "id": "512b6bc9-298b-49f3-8e85-2c2319becd34",
+      "name": "Conversation Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        576,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": {
+          "intent": "order",
+          "orderItems": [],
+          "customerName": "",
+          "customerPhone": "",
+          "reservationDate": "",
+          "reservationTime": "",
+          "partySize": 0,
+          "specialRequests": "",
+          "question": "",
+          "needsHumanHandoff": false,
+          "conversationComplete": false
+        }
+      },
+      "id": "61ccc3a7-95ad-4b51-ab55-df7568943349",
+      "name": "Structured Output",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        704,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.intent }}",
+                    "rightValue": "order",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.intent }}",
+                    "rightValue": "reservation",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.intent }}",
+                    "rightValue": "question",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.needsHumanHandoff }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0cb89fb2-ce86-4470-b1d3-f62b85f94b18",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1136,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "orderSummary",
+              "value": "={{ $(\"Route by Intent\").item.json.output.orderItems.join(\", \") }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "customerName",
+              "value": "={{ $(\"Route by Intent\").item.json.output.customerName }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "customerPhone",
+              "value": "={{ $(\"Route by Intent\").item.json.output.customerPhone }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "specialRequests",
+              "value": "={{ $(\"Route by Intent\").item.json.output.specialRequests }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "callSid",
+              "value": "={{ $('Incoming Call Not Answered').item.json.body.callSid }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "486b6b18-4701-46e3-abec-092956beede1",
+      "name": "Prepare Order Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15559876543)__>",
+        "to": "={{ $json.customerPhone }}",
+        "message": "=Thank you {{ $json.customerName }}! Your order has been confirmed:\n\n{{ $json.orderSummary }}\n\nSpecial requests: {{ $json.specialRequests }}\n\nEstimated wait time: 20-30 minutes.\n\nWe will call you when ready!",
+        "options": {}
+      },
+      "id": "3d28a3ba-322a-42ac-b74f-22d5fcbf0d2c",
+      "name": "Send Order Confirmation SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        192
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Your GHL API endpoint (e.g., https://rest.gohighlevel.com/v1/contacts/{contactId}/notes)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"body\": \"Order received via AI Receptionist:\\n\\nCustomer: \" + $json.customerName + \"\\nPhone: \" + $json.customerPhone + \"\\nOrder: \" + $json.orderSummary + \"\\nSpecial Requests: \" + $json.specialRequests + \"\\nCall SID: \" + $json.callSid } }}",
+        "options": {}
+      },
+      "id": "4f71b5f0-64b4-434d-9d79-c261396e6f79",
+      "name": "Log Order to GoHighLevel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1824,
+        304
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15559876543)__>",
+        "to": "<__PLACEHOLDER_VALUE__Restaurant staff phone number (e.g., +15551111111)__>",
+        "message": "=🍕 NEW ORDER via AI Receptionist\n\nCustomer: {{ $(\"Prepare Order Data\").item.json.customerName }}\nPhone: {{ $(\"Prepare Order Data\").item.json.customerPhone }}\n\nOrder:\n{{ $(\"Prepare Order Data\").item.json.orderSummary }}\n\nSpecial Requests: {{ $(\"Prepare Order Data\").item.json.specialRequests }}",
+        "options": {}
+      },
+      "id": "3fd241e6-3638-4879-829d-63bf7345c885",
+      "name": "Notify Staff - New Order",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        2048,
+        304
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $(\"AI Receptionist\").item.json.text || \"Thank you for calling. Your request has been processed.\" }}",
+        "options": {}
+      },
+      "id": "a130b034-453f-49b8-8524-aaa06fa7fe28",
+      "name": "Respond to Call",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2272,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "customerName",
+              "value": "={{ $(\"Route by Intent\").item.json.output.customerName }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "customerPhone",
+              "value": "={{ $(\"Route by Intent\").item.json.output.customerPhone }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "reservationDate",
+              "value": "={{ $(\"Route by Intent\").item.json.output.reservationDate }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "reservationTime",
+              "value": "={{ $(\"Route by Intent\").item.json.output.reservationTime }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "partySize",
+              "value": "={{ $(\"Route by Intent\").item.json.output.partySize }}",
+              "type": "number"
+            },
+            {
+              "id": "6",
+              "name": "specialRequests",
+              "value": "={{ $(\"Route by Intent\").item.json.output.specialRequests }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "callSid",
+              "value": "={{ $('Incoming Call Not Answered').item.json.body.callSid }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1b9ffc2a-89ec-4a86-9815-cd789a1029f4",
+      "name": "Prepare Reservation Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1600,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15559876543)__>",
+        "to": "={{ $json.customerPhone }}",
+        "message": "=Thank you {{ $json.customerName }}! Your reservation is confirmed:\n\nDate: {{ $json.reservationDate }}\nTime: {{ $json.reservationTime }}\nParty Size: {{ $json.partySize }}\n\nSpecial Requests: {{ $json.specialRequests }}\n\nWe look forward to seeing you!",
+        "options": {}
+      },
+      "id": "a791dfff-9240-46e8-9e54-7d583d81b45f",
+      "name": "Send Reservation Confirmation SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1824,
+        688
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Your GHL API endpoint for opportunities (e.g., https://rest.gohighlevel.com/v1/opportunities)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"name\": \"Reservation - \" + $json.customerName, \"contact\": { \"name\": $json.customerName, \"phone\": $json.customerPhone }, \"customFields\": { \"reservationDate\": $json.reservationDate, \"reservationTime\": $json.reservationTime, \"partySize\": $json.partySize, \"specialRequests\": $json.specialRequests, \"callSid\": $json.callSid } } }}",
+        "options": {}
+      },
+      "id": "1c90c410-f125-4e71-b4b5-780dd9c5c26b",
+      "name": "Log Reservation to GoHighLevel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2048,
+        880
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Your GHL API endpoint (e.g., https://rest.gohighlevel.com/v1/contacts/{contactId}/notes)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"body\": \"General question answered via AI Receptionist:\\n\\nQuestion: \" + $(\"Route by Intent\").item.json.output.question + \"\\nCall SID: \" + $(\"Incoming Call Not Answered\").item.json.body.callSid } }}",
+        "options": {}
+      },
+      "id": "c27f6da7-0593-4435-9c08-e807b9aba81b",
+      "name": "Log Question to GoHighLevel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1824,
+        1648
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "callerPhone",
+              "value": "={{ $('Incoming Call Not Answered').item.json.body.from }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "callSid",
+              "value": "={{ $('Incoming Call Not Answered').item.json.body.callSid }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "conversationSummary",
+              "value": "={{ $(\"Route by Intent\").item.json.output }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3143966d-3cb5-4b42-a864-dea9a20274ae",
+      "name": "Prepare Handoff Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1600,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Your GHL API endpoint for tasks (e.g., https://rest.gohighlevel.com/v1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"title\": \"URGENT: Customer Callback Request\", \"description\": \"Customer requested to speak with staff\\n\\nCaller: \" + $json.callerPhone + \"\\nCall SID: \" + $json.callSid + \"\\n\\nConversation Summary: \" + JSON.stringify($json.conversationSummary), \"priority\": \"high\", \"dueDate\": $now.plus({ hours: 1 }).toISO() } }}",
+        "options": {}
+      },
+      "id": "e4a5762f-87ff-4412-bcf1-b131cde36a78",
+      "name": "Log Callback Request to GoHighLevel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1824,
+        1264
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15559876543)__>",
+        "to": "<__PLACEHOLDER_VALUE__Restaurant staff phone number (e.g., +15551111111)__>",
+        "message": "=🚨 URGENT CALLBACK REQUEST\n\nCustomer: {{ $(\"Prepare Handoff Data\").item.json.callerPhone }}\nCall SID: {{ $(\"Prepare Handoff Data\").item.json.callSid }}\n\nCustomer requested to speak with staff. Please call back ASAP.",
+        "options": {}
+      },
+      "id": "cd83c06e-c0cf-4ce4-93c4-4a19d6dd91ad",
+      "name": "Notify Staff - Callback Request",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        2048,
+        1072
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Your GHL API endpoint (e.g., https://rest.gohighlevel.com/v1/contacts/{contactId}/notes)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"body\": \"SMS FAILED - Order Confirmation\\n\\nCustomer: \" + $(\"Prepare Order Data\").item.json.customerName + \"\\nPhone: \" + $(\"Prepare Order Data\").item.json.customerPhone + \"\\nOrder: \" + $(\"Prepare Order Data\").item.json.orderSummary + \"\\n\\nError: SMS delivery failed\", \"tags\": [\"SMS-Failed\"] } }}",
+        "options": {}
+      },
+      "id": "1813ed3d-00b2-456e-9986-272afb3ccc21",
+      "name": "Handle Order SMS Error",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1824,
+        112
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "2e862455-34e6-471b-942b-bdb6eb60638a",
+      "name": "Fallback Order to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2048,
+        112
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Restaurant owner email (e.g., owner@restaurant.com)__>",
+        "subject": "=URGENT: GHL Logging Failed - Order Data",
+        "message": "=<h2>GoHighLevel Logging Failed</h2><p>An order could not be logged to GoHighLevel. Please process manually:</p><ul><li><strong>Customer:</strong> {{ $(\"Prepare Order Data\").item.json.customerName }}</li><li><strong>Phone:</strong> {{ $(\"Prepare Order Data\").item.json.customerPhone }}</li><li><strong>Order:</strong> {{ $(\"Prepare Order Data\").item.json.orderSummary }}</li><li><strong>Special Requests:</strong> {{ $(\"Prepare Order Data\").item.json.specialRequests }}</li><li><strong>Call SID:</strong> {{ $(\"Prepare Order Data\").item.json.callSid }}</li><li><strong>Timestamp:</strong> {{ $now.toISO() }}</li></ul>",
+        "options": {}
+      },
+      "id": "612a4602-5e1a-42d0-bbe9-80f0b31ef752",
+      "name": "Fallback Order GHL Failure",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2048,
+        496
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Restaurant owner email (e.g., owner@restaurant.com)__>",
+        "subject": "=Staff SMS Failed - New Order Alert",
+        "message": "=<h2>Staff SMS Notification Failed</h2><p>Could not send SMS to staff. New order details:</p><ul><li><strong>Customer:</strong> {{ $(\"Prepare Order Data\").item.json.customerName }}</li><li><strong>Phone:</strong> {{ $(\"Prepare Order Data\").item.json.customerPhone }}</li><li><strong>Order:</strong> {{ $(\"Prepare Order Data\").item.json.orderSummary }}</li><li><strong>Special Requests:</strong> {{ $(\"Prepare Order Data\").item.json.specialRequests }}</li></ul>",
+        "options": {}
+      },
+      "id": "5369ccb0-99b5-4476-bfb9-16b170a7b6bc",
+      "name": "Handle Staff SMS Error",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2272,
+        256
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Your GHL API endpoint (e.g., https://rest.gohighlevel.com/v1/contacts/{contactId}/notes)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"body\": \"SMS FAILED - Reservation Confirmation\\n\\nCustomer: \" + $(\"Prepare Reservation Data\").item.json.customerName + \"\\nPhone: \" + $(\"Prepare Reservation Data\").item.json.customerPhone + \"\\nReservation: \" + $(\"Prepare Reservation Data\").item.json.reservationDate + \" at \" + $(\"Prepare Reservation Data\").item.json.reservationTime + \"\\n\\nError: SMS delivery failed\", \"tags\": [\"SMS-Failed\"] } }}",
+        "options": {}
+      },
+      "id": "53ce0468-806b-4c3f-96ec-824c3d13ce3d",
+      "name": "Handle Reservation SMS Error",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2048,
+        688
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "ad4e2136-af08-4223-a833-957ade98401b",
+      "name": "Fallback Reservation to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2272,
+        784
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Restaurant owner email (e.g., owner@restaurant.com)__>",
+        "subject": "=URGENT: GHL Logging Failed - Reservation Data",
+        "message": "=<h2>GoHighLevel Logging Failed</h2><p>A reservation could not be logged to GoHighLevel. Please process manually:</p><ul><li><strong>Customer:</strong> {{ $(\"Prepare Reservation Data\").item.json.customerName }}</li><li><strong>Phone:</strong> {{ $(\"Prepare Reservation Data\").item.json.customerPhone }}</li><li><strong>Date:</strong> {{ $(\"Prepare Reservation Data\").item.json.reservationDate }}</li><li><strong>Time:</strong> {{ $(\"Prepare Reservation Data\").item.json.reservationTime }}</li><li><strong>Party Size:</strong> {{ $(\"Prepare Reservation Data\").item.json.partySize }}</li><li><strong>Special Requests:</strong> {{ $(\"Prepare Reservation Data\").item.json.specialRequests }}</li><li><strong>Call SID:</strong> {{ $(\"Prepare Reservation Data\").item.json.callSid }}</li><li><strong>Timestamp:</strong> {{ $now.toISO() }}</li></ul>",
+        "options": {}
+      },
+      "id": "164fae32-4a9c-48c1-9c7f-4f0ca9b41411",
+      "name": "Fallback Reservation GHL Failure",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2272,
+        1024
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Restaurant owner email (e.g., owner@restaurant.com)__>",
+        "subject": "=GHL Logging Failed - Customer Question",
+        "message": "=<h2>GoHighLevel Logging Failed</h2><p>A customer question could not be logged to GoHighLevel:</p><ul><li><strong>Question:</strong> {{ $(\"Route by Intent\").item.json.output.question }}</li><li><strong>Call SID:</strong> {{ $(\"Incoming Call Not Answered\").item.json.body.callSid }}</li><li><strong>Timestamp:</strong> {{ $now.toISO() }}</li></ul>",
+        "options": {}
+      },
+      "id": "7c7f7005-8265-43b4-a433-12d615544db9",
+      "name": "Fallback Question GHL Failure",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2048,
+        1648
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Restaurant owner email (e.g., owner@restaurant.com)__>",
+        "subject": "=URGENT: GHL Logging Failed - Callback Request",
+        "message": "=<h2>GoHighLevel Logging Failed</h2><p>A callback request could not be logged to GoHighLevel:</p><ul><li><strong>Caller Phone:</strong> {{ $(\"Prepare Handoff Data\").item.json.callerPhone }}</li><li><strong>Call SID:</strong> {{ $(\"Prepare Handoff Data\").item.json.callSid }}</li><li><strong>Conversation Summary:</strong> {{ JSON.stringify($(\"Prepare Handoff Data\").item.json.conversationSummary) }}</li><li><strong>Timestamp:</strong> {{ $now.toISO() }}</li></ul>",
+        "options": {}
+      },
+      "id": "764fd508-6501-42e2-afd5-3c9b61a90359",
+      "name": "Fallback Callback GHL Failure",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2048,
+        1264
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Restaurant owner email (e.g., owner@restaurant.com)__>",
+        "subject": "=URGENT: Staff SMS Failed - Callback Request",
+        "message": "=<h2>Staff SMS Notification Failed</h2><p>Could not send SMS to staff about callback request:</p><ul><li><strong>Caller Phone:</strong> {{ $(\"Prepare Handoff Data\").item.json.callerPhone }}</li><li><strong>Call SID:</strong> {{ $(\"Prepare Handoff Data\").item.json.callSid }}</li><li><strong>Timestamp:</strong> {{ $now.toISO() }}</li></ul>",
+        "options": {}
+      },
+      "id": "62bbcfaf-d224-4dd0-952c-a82248bf08b9",
+      "name": "Handle Callback SMS Error",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2272,
+        1312
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "output",
+              "value": {
+                "intent": "handoff",
+                "needsHumanHandoff": true,
+                "conversationComplete": true
+              },
+              "type": "object"
+            },
+            {
+              "id": "2",
+              "name": "text",
+              "value": "I'm sorry, I'm having trouble processing your request right now. Please hold while I connect you to a team member.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6b176935-8694-4fa4-8be7-ad8aaa631ceb",
+      "name": "Handle AI Failure",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        912,
+        544
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "4e7cf17b-3966-4d0c-87c0-a33fa752c21a",
+      "name": "Global Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        336,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Restaurant manager email (e.g., manager@restaurant.com)__>",
+        "subject": "=CRITICAL: AI Receptionist Workflow Error",
+        "message": "=<h2>Workflow Error Alert</h2><p>The AI Receptionist workflow encountered an error:</p><ul><li><strong>Error Message:</strong> {{ $json.error.message }}</li><li><strong>Workflow:</strong> {{ $workflow.name }}</li><li><strong>Execution ID:</strong> {{ $execution.id }}</li><li><strong>Timestamp:</strong> {{ $now.toISO() }}</li></ul><p>Please investigate immediately.</p>",
+        "options": {}
+      },
+      "id": "7ea52918-cced-4ace-9713-81a5c804a701",
+      "name": "Notify Manager of Error",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        960
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15559876543)__>",
+        "to": "={{ $(\"Route by Intent\").item.json.output.customerPhone }}",
+        "message": "Thank you for contacting [Restaurant Name]. We've noted your question and a team member will follow up with you shortly.",
+        "options": {}
+      },
+      "id": "8423356c-f06a-40ed-9c78-3a6f51b1e3d4",
+      "name": "Send Question Confirmation SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        2048,
+        1456
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Restaurant owner email (e.g., owner@restaurant.com)__>",
+        "subject": "=SMS Failed - Customer Question Follow-up",
+        "message": "=<h2>SMS Notification Failed</h2><p>Could not send follow-up SMS to customer about their question:</p><ul><li><strong>Customer Phone:</strong> {{ $(\"Route by Intent\").item.json.output.customerPhone }}</li><li><strong>Question:</strong> {{ $(\"Route by Intent\").item.json.output.question }}</li><li><strong>Call SID:</strong> {{ $(\"Incoming Call Not Answered\").item.json.body.callSid }}</li><li><strong>Timestamp:</strong> {{ $now.toISO() }}</li></ul>",
+        "options": {}
+      },
+      "id": "5b328d6e-0e60-418e-9346-e747fffbc40d",
+      "name": "Handle Question SMS Error",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2272,
+        1504
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 1. CALL HANDLING & AI ROUTING",
+        "height": 400,
+        "width": 1280,
+        "color": 2
+      },
+      "id": "5ccdd023-ae67-46d3-b784-b814e5dd4ab8",
+      "name": "Sticky Note 9b9c952f",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        208,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. ORDER FLOW",
+        "height": 520,
+        "width": 1056,
+        "color": 3
+      },
+      "id": "9a3946df-8550-4d9a-ba60-eefe5601110e",
+      "name": "Sticky Note 797ba8fd",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3. RESERVATION FLOW",
+        "height": 440,
+        "width": 1040,
+        "color": 4
+      },
+      "id": "4798b9b9-30c7-4cdd-8bb4-c2122e1e34f4",
+      "name": "Sticky Note 637468b4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1488,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4. CALLBACK & QUESTION FLOW",
+        "height": 792,
+        "width": 1040,
+        "color": 5
+      },
+      "id": "36e98deb-fea2-447e-a1e5-0a399458c50b",
+      "name": "Sticky Note 1459c7d1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1504,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5. GLOBAL ERROR HANDLING",
+        "height": 248,
+        "width": 512,
+        "color": 6
+      },
+      "id": "556aff8c-0f0a-4868-948b-7177fd9c3009",
+      "name": "Sticky Note 9629c8ed",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## WORKFLOW BENEFITS\n\n✓ Answers every call 24/7 — orders, reservations, and callbacks never go to voicemail\n\n✓ Understands caller intent automatically and routes to the right flow\n\n✓ Confirms every order and reservation by SMS so nothing is miscommunicated\n\n✓ Staff get notified instantly for new orders, reservations, and callback requests\n\n✓ If any step fails, it logs to a backup sheet and alerts the manager — nothing silently disappears",
+        "height": 360,
+        "width": 520,
+        "color": 7
+      },
+      "id": "89277886-6e02-443a-a367-5990a10e1692",
+      "name": "Sticky Note d59bf5a7",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2560,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Incoming Call Not Answered": {
+      "main": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Receptionist": {
+      "main": [
+        [
+          {
+            "node": "Route by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle AI Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI GPT Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Intent": {
+      "main": [
+        [
+          {
+            "node": "Prepare Order Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Reservation Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Question to GoHighLevel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Handoff Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Order Data": {
+      "main": [
+        [
+          {
+            "node": "Send Order Confirmation SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Order Confirmation SMS": {
+      "main": [
+        [
+          {
+            "node": "Log Order to GoHighLevel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Order SMS Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Order to GoHighLevel": {
+      "main": [
+        [
+          {
+            "node": "Notify Staff - New Order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fallback Order GHL Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Staff - New Order": {
+      "main": [
+        [
+          {
+            "node": "Respond to Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Staff SMS Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reservation Data": {
+      "main": [
+        [
+          {
+            "node": "Send Reservation Confirmation SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reservation Confirmation SMS": {
+      "main": [
+        [
+          {
+            "node": "Log Reservation to GoHighLevel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Reservation SMS Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Reservation to GoHighLevel": {
+      "main": [
+        [
+          {
+            "node": "Respond to Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fallback Reservation GHL Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Question to GoHighLevel": {
+      "main": [
+        [
+          {
+            "node": "Send Question Confirmation SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fallback Question GHL Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Handoff Data": {
+      "main": [
+        [
+          {
+            "node": "Log Callback Request to GoHighLevel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Callback Request to GoHighLevel": {
+      "main": [
+        [
+          {
+            "node": "Notify Staff - Callback Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fallback Callback GHL Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Staff - Callback Request": {
+      "main": [
+        [
+          {
+            "node": "Respond to Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Callback SMS Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Order SMS Error": {
+      "main": [
+        [
+          {
+            "node": "Fallback Order to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Reservation SMS Error": {
+      "main": [
+        [
+          {
+            "node": "Fallback Reservation to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle AI Failure": {
+      "main": [
+        [
+          {
+            "node": "Route by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Global Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Notify Manager of Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Manager of Error": {
+      "main": [
+        []
+      ]
+    },
+    "Send Question Confirmation SMS": {
+      "main": [
+        [
+          {
+            "node": "Respond to Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Question SMS Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

@@ -1,0 +1,567 @@
+{
+  "name": "Roofing Contractor AI Lead Intake & Routing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "roofing-lead-intake",
+        "options": {
+          "responseData": "={{ { \"status\": \"received\", \"message\": \"Lead captured successfully\" } }}"
+        }
+      },
+      "id": "1a9b848f-e49e-44b6-8ef4-0543c74fbfb3",
+      "name": "Inbound Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "source",
+              "value": "={{ $json.body.source || \"Unknown\" }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "full_name",
+              "value": "={{ $json.body.full_name || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "phone",
+              "value": "={{ $json.body.phone || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "email",
+              "value": "={{ $json.body.email || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "city",
+              "value": "={{ $json.body.city || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "address",
+              "value": "={{ $json.body.address || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "job_type",
+              "value": "={{ $json.body.job_type || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "roof_issue_description",
+              "value": "={{ $json.body.roof_issue_description || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "active_damage",
+              "value": "={{ $json.body.active_damage || \"no\" }}",
+              "type": "string"
+            },
+            {
+              "id": "11",
+              "name": "emergency_keywords_detected",
+              "value": "={{ $json.body.emergency_keywords_detected || \"no\" }}",
+              "type": "string"
+            },
+            {
+              "id": "12",
+              "name": "insurance_claim",
+              "value": "={{ $json.body.insurance_claim || \"no\" }}",
+              "type": "string"
+            },
+            {
+              "id": "13",
+              "name": "ready_now",
+              "value": "={{ $json.body.ready_now || \"no\" }}",
+              "type": "string"
+            },
+            {
+              "id": "14",
+              "name": "preferred_appointment_time",
+              "value": "={{ $json.body.preferred_appointment_time || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "15",
+              "name": "urgency_score",
+              "value": "={{ $json.body.urgency_score || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "16",
+              "name": "notes",
+              "value": "={{ $json.body.notes || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "17",
+              "name": "call_summary",
+              "value": "={{ $json.body.call_summary || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "18",
+              "name": "transcript_url",
+              "value": "={{ $json.body.transcript_url || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "19",
+              "name": "vapi_call_id",
+              "value": "={{ $json.body.vapi_call_id || \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b8dfc1d1-205e-4ae9-890d-50396dac904d",
+      "name": "Normalize Lead Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        464,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const emergencyKeywords = [\n  'leak', 'leaking', 'water coming in', 'tarp', 'storm damage',\n  'tree fell', 'ceiling collapse', 'hail damage', 'active rain damage',\n  'urgent', 'emergency'\n];\n\nconst description = ($json.roof_issue_description || '').toLowerCase();\nconst notes = ($json.notes || '').toLowerCase();\nconst summary = ($json.call_summary || '').toLowerCase();\n\nconst combinedText = description + ' ' + notes + ' ' + summary;\n\nconst hasEmergencyKeyword = emergencyKeywords.some(keyword => \n  combinedText.includes(keyword.toLowerCase())\n);\n\nreturn {\n  ...($json),\n  emergency_keywords_detected: hasEmergencyKeyword ? 'yes' : $json.emergency_keywords_detected\n};"
+      },
+      "id": "ac07836a-0faf-45c1-a495-aca9e23ad33f",
+      "name": "Detect Emergency Keywords",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const activeDamage = ($json.active_damage || '').toLowerCase() === 'yes';\nconst emergencyKeywords = ($json.emergency_keywords_detected || '').toLowerCase() === 'yes';\nconst urgencyScore = parseInt($json.urgency_score) || 0;\n\nlet branch = 'Cold';\n\nif (activeDamage || emergencyKeywords || urgencyScore >= 9) {\n  branch = 'Emergency';\n} else if (urgencyScore >= 7) {\n  branch = 'Hot';\n} else if (urgencyScore >= 4) {\n  branch = 'Warm';\n}\n\nreturn {\n  ...($json),\n  branch: branch\n};"
+      },
+      "id": "76a79d20-4c17-4c4c-be95-74d10a354b13",
+      "name": "Determine Branch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.branch }}",
+                    "rightValue": "Emergency",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Emergency"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.branch }}",
+                    "rightValue": "Hot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Hot"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.branch }}",
+                    "rightValue": "Warm",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Warm"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Cold"
+        }
+      },
+      "id": "ddba2ed2-f6fd-4023-a76b-531d0ec92d60",
+      "name": "Route by Branch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1136,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__JobNimbus API URL (e.g., https://app.jobnimbus.com/api1/contacts)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"display_name\": $json.full_name, \"first_name\": $json.full_name.split(\" \")[0], \"last_name\": $json.full_name.split(\" \")[1] || \"\", \"email\": $json.email, \"phone\": $json.phone, \"address_line1\": $json.address, \"city\": $json.city, \"tags\": [\"EMERGENCY\"], \"status_name\": \"New Lead\", \"record_type_name\": \"Contact\", \"custom_fields\": { \"source\": $json.source, \"urgency_score\": $json.urgency_score, \"job_type\": $json.job_type, \"roof_issue\": $json.roof_issue_description, \"insurance_claim\": $json.insurance_claim, \"vapi_call_id\": $json.vapi_call_id } } }}",
+        "options": {}
+      },
+      "id": "82741c69-71bd-4863-92be-d31874815257",
+      "name": "Create JobNimbus Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "<__PLACEHOLDER_VALUE__Team phone number (e.g., +15559876543)__>",
+        "message": "={{ \"🚨 EMERGENCY LEAD ALERT\\n\\nName: \" + $json.full_name + \"\\nPhone: \" + $json.phone + \"\\nIssue: \" + $json.roof_issue_description + \"\\nUrgency: \" + $json.urgency_score + \"/10\\n\\nAction Required: Contact immediately!\" }}",
+        "options": {}
+      },
+      "id": "3d224581-2b85-49af-9142-7a9d58866283",
+      "name": "Send Team SMS Alert",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Team email (e.g., emergency@roofingcompany.com)__>",
+        "subject": "={{ \"🚨 EMERGENCY LEAD: \" + $(\"Determine Branch\").item.json.full_name + \" - \" + $(\"Determine Branch\").item.json.city }}",
+        "message": "={{ \"<h2>Emergency Roofing Lead</h2><p><strong>Name:</strong> \" + $(\"Determine Branch\").item.json.full_name + \"</p><p><strong>Phone:</strong> \" + $(\"Determine Branch\").item.json.phone + \"</p><p><strong>Email:</strong> \" + $(\"Determine Branch\").item.json.email + \"</p><p><strong>Address:</strong> \" + $(\"Determine Branch\").item.json.address + \", \" + $(\"Determine Branch\").item.json.city + \"</p><p><strong>Issue:</strong> \" + $(\"Determine Branch\").item.json.roof_issue_description + \"</p><p><strong>Urgency Score:</strong> \" + $(\"Determine Branch\").item.json.urgency_score + \"/10</p><p><strong>Active Damage:</strong> \" + $(\"Determine Branch\").item.json.active_damage + \"</p><p><strong>Insurance Claim:</strong> \" + $(\"Determine Branch\").item.json.insurance_claim + \"</p><p><strong>Source:</strong> \" + $(\"Determine Branch\").item.json.source + \"</p><p><strong>Call Summary:</strong> \" + $(\"Determine Branch\").item.json.call_summary + \"</p><p><strong>Notes:</strong> \" + $(\"Determine Branch\").item.json.notes + \"</p><hr><p style=\\\"color: red;\\\"><strong>ACTION REQUIRED: Contact customer immediately!</strong></p>\" }}",
+        "options": {}
+      },
+      "id": "c2e31195-627e-4a97-9484-1d4c38d162e6",
+      "name": "Send Team Email Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1808,
+        208
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "e2f51374-5c87-4c64-a938-8449d21e4cb6",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2032,
+        208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $(\"Determine Branch\").item.json.phone }}",
+        "message": "={{ \"Thank you for contacting us, \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \"! Our emergency roofing team has been alerted about your \" + $(\"Determine Branch\").item.json.job_type.toLowerCase() + \" request. We will contact you shortly to schedule an immediate inspection. For urgent matters, call us at [YOUR PHONE]. - [YOUR COMPANY]\" }}",
+        "options": {}
+      },
+      "id": "e0078da9-7d01-4cb4-aef6-0e6dbaf8c8ec",
+      "name": "Send Customer Confirmation SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        2256,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "status",
+              "value": "Hot lead - implement similar workflow",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7a98c53c-9d05-4a15-b3bf-4846230fa1ea",
+      "name": "Hot Lead Processing",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "status",
+              "value": "Warm lead - implement similar workflow",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f017a6f4-8059-4509-837b-0970bc27c467",
+      "name": "Warm Lead Processing",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "status",
+              "value": "Cold lead - implement similar workflow",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1558a5d8-e7d5-4890-b531-21993e612a26",
+      "name": "Cold Lead Processing",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        784
+      ]
+    }
+  ],
+  "connections": {
+    "Inbound Lead Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Detect Emergency Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Emergency Keywords": {
+      "main": [
+        [
+          {
+            "node": "Determine Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Branch": {
+      "main": [
+        [
+          {
+            "node": "Route by Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Branch": {
+      "main": [
+        [
+          {
+            "node": "Create JobNimbus Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hot Lead Processing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Warm Lead Processing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cold Lead Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create JobNimbus Lead": {
+      "main": [
+        [
+          {
+            "node": "Send Team SMS Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Team SMS Alert": {
+      "main": [
+        [
+          {
+            "node": "Send Team Email Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Team Email Alert": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Send Customer Confirmation SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

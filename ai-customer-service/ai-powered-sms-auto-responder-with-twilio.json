@@ -1,0 +1,258 @@
+{
+  "name": "AI-Powered SMS Auto-Responder with Twilio",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.messageText }}",
+        "options": {
+          "systemMessage": "You are a helpful assistant responding to customer WhatsApp messages. Keep replies short, clear, and friendly."
+        }
+      },
+      "id": "cd5dd0a4-bb07-4c7a-940a-c42f2aaf45f7",
+      "name": "Generate AI Reply",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        688,
+        304
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-5-20250929"
+        },
+        "options": {}
+      },
+      "id": "5a681580-9c61-47be-bd66-eee3e0361e31",
+      "name": "Claude Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        760,
+        528
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fa029370-6a16-4c79-8797-5b9ed1f07660",
+      "name": "Check AI Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1040,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio WhatsApp number (e.g. whatsapp:+15551234567)__>",
+        "to": "={{ $(\"Extract WhatsApp Data\").item.json.senderPhone }}",
+        "toWhatsapp": true,
+        "message": "={{ $json.output }}",
+        "options": {}
+      },
+      "id": "32e2b879-fdb1-4d97-8b4f-3f420628982d",
+      "name": "Send AI Reply",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "fallbackMessage",
+              "value": "Sorry, something went wrong. Please try again later.",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "senderPhone",
+              "value": "={{ $(\"Extract WhatsApp Data\").item.json.senderPhone }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "da98dc42-7429-4ff9-9f0c-d1f3c2352f86",
+      "name": "Prepare Fallback Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1264,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio WhatsApp number (e.g. whatsapp:+15551234567)__>",
+        "to": "={{ $json.senderPhone }}",
+        "toWhatsapp": true,
+        "message": "={{ $json.fallbackMessage }}",
+        "options": {}
+      },
+      "id": "982a8c2c-5e07-43c0-870f-232ca639c864",
+      "name": "Send Fallback Reply",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1488,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<__PLACEHOLDER_VALUE__twilio-whatsapp (configure this URL in your Twilio WhatsApp settings)__>",
+        "options": {}
+      },
+      "id": "d7000432-7ee8-46f5-8bbe-c03eb5d7afb5",
+      "name": "Receive WhatsApp from Twilio",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "senderPhone",
+              "value": "={{ $json.body.From }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "messageText",
+              "value": "={{ $json.body.Body }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "20c210bd-a429-4c46-9eb9-3921251715a4",
+      "name": "Extract WhatsApp Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        464,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Generate AI Reply": {
+      "main": [
+        [
+          {
+            "node": "Check AI Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate AI Reply",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check AI Success": {
+      "main": [
+        [
+          {
+            "node": "Send AI Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Fallback Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Fallback Message": {
+      "main": [
+        [
+          {
+            "node": "Send Fallback Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive WhatsApp from Twilio": {
+      "main": [
+        [
+          {
+            "node": "Extract WhatsApp Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract WhatsApp Data": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

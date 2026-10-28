@@ -1,0 +1,1913 @@
+{
+  "name": "RingCentral Inbound Calls",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<__PLACEHOLDER_VALUE__webhook-path (e.g., ringcentral-call-event)__>",
+        "options": {}
+      },
+      "id": "05611c01-b76f-400c-9e3b-af50219a8858",
+      "name": "Webhook - RingCentral Call Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        192,
+        1792
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "callerPhone",
+              "value": "={{ $json.body.caller.phoneNumber }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "callerName",
+              "value": "={{ $json.body.caller.name || \"Unknown Caller\" }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "callId",
+              "value": "={{ $json.body.callId }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "sessionId",
+              "value": "={{ $json.body.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "eventType",
+              "value": "={{ $json.body.eventType }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "callStatus",
+              "value": "={{ $json.body.telephonyStatus }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "timestamp",
+              "value": "={{ $json.body.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "voicemailId",
+              "value": "={{ $json.body.voicemailId || null }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "recordingId",
+              "value": "={{ $json.body.recordingId || null }}",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "businessTimezone",
+              "value": "<__PLACEHOLDER_VALUE__BUSINESS_TIMEZONE (e.g., America/Chicago)__>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6e425109-2b2c-4693-ae65-3fd245ba734c",
+      "name": "Set - Normalize Call Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        1792
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ \"https://api.appfolio.com/api/v1/tasks?phone=\" + $json.callerPhone + \"&created_after=\" + $now.minus({ hours: 2 }).toISO() }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "fa0d20d9-4bcb-4174-ba80-759ffd7f0c86",
+      "name": "HTTP Request - AppFolio Search Recent Caller Records",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        640,
+        1792
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "1",
+              "leftValue": "={{ $json.results.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "64fedd0a-5b8d-4430-8a56-3a37378e21cc",
+      "name": "IF - Duplicate Found Within 2 Hours",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        864,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appfolio.com/api/v1/activity_logs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"phone\": $(\"Set - Normalize Call Data\").item.json.callerPhone, \"type\": \"duplicate_call_prevented\", \"message\": \"Duplicate call/task prevented within 2-hour window.\", \"call_id\": $(\"Set - Normalize Call Data\").item.json.callId, \"timestamp\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "9af59111-e43d-4cc4-bdc7-3893108be8f6",
+      "name": "AppFolio - Log Duplicate Interaction",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3904,
+        192
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "errorMessage": "Duplicate call prevented within 2-hour window. No further action taken."
+      },
+      "id": "2f678952-4216-4565-98c0-6be760117821",
+      "name": "Stop - Duplicate Prevented",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        4128,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { DateTime } = require('luxon');\n\nconst timezone = $input.first().json.businessTimezone || 'America/Chicago';\nconst now = DateTime.now().setZone(timezone);\n\nconst day = now.weekday; // 1 = Monday, 7 = Sunday\nconst time = now.toFormat('HH:mm');\n\nlet insideBusinessHours = false;\n\nif (day >= 1 && day <= 5) {\n  insideBusinessHours = time >= '08:00' && time <= '18:00';\n}\n\nif (day === 6) {\n  insideBusinessHours = time >= '09:00' && time <= '13:00';\n}\n\nreturn $input.all().map(item => ({\n  json: {\n    ...item.json,\n    currentLocalTime: now.toISO(),\n    currentDay: day,\n    insideBusinessHours\n  }\n}));"
+      },
+      "id": "4e6576f6-b813-43bb-8913-923d8ada94f8",
+      "name": "Code - Check Business Hours",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        2432
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "1",
+              "leftValue": "={{ $json.insideBusinessHours }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "44d64517-79cc-49f8-b651-c75fa714ebcd",
+      "name": "IF - Inside Business Hours?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1312,
+        2432
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "1",
+                    "leftValue": "={{ $json.callStatus }}",
+                    "rightValue": "Answered",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Answered"
+            },
+            {
+              "conditions": {
+                "combinator": "or",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "1",
+                    "leftValue": "={{ $json.callStatus }}",
+                    "rightValue": "Missed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "2",
+                    "leftValue": "={{ $json.callStatus }}",
+                    "rightValue": "Abandoned",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Missed/Abandoned"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "1",
+                    "leftValue": "={{ $json.callStatus }}",
+                    "rightValue": "Voicemail",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Voicemail"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "41157d4d-63a3-4365-814a-423318c557cd",
+      "name": "Switch - Live Call Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1536,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appfolio.com/api/v1/contacts/upsert",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"phone\": $json.callerPhone, \"name\": $json.callerName, \"source\": \"RingCentral Live Call\", \"last_call_id\": $json.callId, \"last_contacted_at\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "441f6826-1fed-4794-9e06-f29541d3f544",
+      "name": "AppFolio - Upsert Contact Record (Answered)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3680,
+        512
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appfolio.com/api/v1/activity_logs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"phone\": $(\"Switch - Live Call Status\").item.json.callerPhone, \"type\": \"answered_live_call\", \"message\": \"Inbound call answered during business hours.\", \"call_id\": $(\"Switch - Live Call Status\").item.json.callId, \"timestamp\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "b46e0a36-3ea6-414f-9054-605d8236c81b",
+      "name": "AppFolio - Log Answered Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3904,
+        432
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "transcriptionText",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "requiresCallback",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "91467b1d-0171-440e-8199-fc067de19f70",
+      "name": "Set - Prepare Missed Call Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1984,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ \"https://platform.ringcentral.com/restapi/v1.0/account/\" + \"<__PLACEHOLDER_VALUE__RINGCENTRAL_ACCOUNT_ID__>\" + \"/extension/\" + \"<__PLACEHOLDER_VALUE__RINGCENTRAL_EXTENSION_ID__>\" + \"/message-store/\" + $json.voicemailId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "c7f52dd7-f69d-451a-a7d4-d965d03713e1",
+      "name": "RingCentral - Fetch Voicemail Transcription",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1760,
+        2816
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "transcriptionText",
+              "value": "={{ $json.transcription || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "requiresCallback",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "includeFields": "callerPhone,callerName,callId,sessionId,eventType,callStatus,timestamp,voicemailId,recordingId,businessTimezone,currentLocalTime,currentDay,insideBusinessHours",
+        "options": {}
+      },
+      "id": "17cf1d27-5a4e-4139-a6bf-0588bec631e2",
+      "name": "Set - Prepare Voicemail Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1984,
+        2896
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "transcriptionText",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "requiresCallback",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "3",
+              "name": "afterHours",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "9d2357af-8c71-4404-aba9-d0f478153050",
+      "name": "Set - After Hours Call Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3232,
+        3056
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__SMS_FROM_NUMBER (e.g., +15559876543)__>",
+        "to": "={{ $json.callerPhone }}",
+        "message": "Thank you for calling! Our office is currently closed. We will return your call during business hours (Mon-Fri 8am-6pm, Sat 9am-1pm CT). For urgent matters, please text this number.",
+        "options": {}
+      },
+      "id": "9dab2046-6f40-4882-88dd-8bd49cc6d3d7",
+      "name": "Twilio - Send After Hours SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        3456,
+        3056
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appfolio.com/api/v1/tasks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"title\": \"After Hours Call - \" + $(\"Set - After Hours Call Data\").item.json.callerName, \"description\": \"Missed call from \" + $(\"Set - After Hours Call Data\").item.json.callerPhone + \" at \" + $(\"Set - After Hours Call Data\").item.json.currentLocalTime + \". Auto-SMS sent.\", \"priority\": \"high\", \"phone\": $(\"Set - After Hours Call Data\").item.json.callerPhone, \"call_id\": $(\"Set - After Hours Call Data\").item.json.callId, \"created_at\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "3260b617-184b-46f5-a3c8-2b5ae1e07ec4",
+      "name": "AppFolio - Create After Hours Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3680,
+        3136
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__SLACK_LEASING_CHANNEL (e.g., C01234567)__>"
+        },
+        "text": "={{ \"🌙 *After Hours Call*\\n*From:* \" + $(\"AppFolio - Create After Hours Task\").item.json.id + \" (\" + $(\"Set - After Hours Call Data\").item.json.callerPhone + \")\\n*Time:* \" + $(\"Set - After Hours Call Data\").item.json.currentLocalTime + \"\\n*Status:* Auto-SMS sent, task created\" }}",
+        "otherOptions": {}
+      },
+      "id": "90d5da17-af0b-4117-a2df-99f14b06b7e4",
+      "name": "Slack - Notify After Hours Call",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3904,
+        3152
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "id": "66b18745-548b-4e4a-8d40-90b0231510ee",
+      "name": "Merge - Qualification Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2208,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"You are classifying inbound calls for a property management company.\\n\\nUse the caller phone number, voicemail transcription, and call metadata.\\n\\nReturn only valid JSON.\\n\\nAllowed categories:\\n- Maintenance Request\\n- Leasing Enquiry\\n- Rent/Payment Issue\\n- General Enquiry\\n- Unknown\\n\\nCaller phone: \" + $json.callerPhone + \"\\n\\nCaller name: \" + $json.callerName + \"\\n\\nCall metadata:\\nCall ID: \" + $json.callId + \"\\nStatus: \" + $json.callStatus + \"\\nEvent Type: \" + $json.eventType + \"\\nTimestamp: \" + $json.timestamp + \"\\n\\nTranscription: \" + $json.transcriptionText + \"\\n\\nReturn JSON in this format:\\n{\\n  \\\"category\\\": \\\"\\\",\\n  \\\"confidence\\\": 0,\\n  \\\"summary\\\": \\\"\\\",\\n  \\\"recommended_action\\\": \\\"\\\"\\n}\" }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a helpful assistant that classifies property management calls accurately.",
+          "maxIterations": 10
+        }
+      },
+      "id": "408a4613-c368-4634-8e9c-2fcbdc35389a",
+      "name": "AI Agent - Classify Caller Intent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2432,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "b6751c2b-3587-457a-afda-05c8143054bf",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2448,
+        2160
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": {
+          "category": "Maintenance Request",
+          "confidence": 0.91,
+          "summary": "Caller reports a leaking sink.",
+          "recommended_action": "Create urgent maintenance callback task."
+        }
+      },
+      "id": "498e6f54-512b-4c0d-9ac8-467235fbed63",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2576,
+        2160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { DateTime } = require('luxon');\n\nconst now = DateTime.now().setZone('America/Chicago');\n\nconst category = $input.first().json.category;\n\nlet minutes = 240;\n\nif (category === 'Maintenance Request') minutes = 60;\nif (category === 'Leasing Enquiry') minutes = 30;\nif (category === 'Rent/Payment Issue') minutes = 120;\nif (category === 'General Enquiry') minutes = 240;\nif (category === 'Unknown') minutes = 240;\n\nreturn $input.all().map(item => ({\n  json: {\n    ...item.json,\n    slaMinutes: minutes,\n    slaDeadline: now.plus({ minutes }).toISO()\n  }\n}));"
+      },
+      "id": "1a92cb9a-6733-41d2-bd94-6196aa3badfd",
+      "name": "Code - Calculate SLA Deadline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2784,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "1",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "Maintenance Request",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Maintenance Request"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "1",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "Leasing Enquiry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Leasing Enquiry"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "1",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "Rent/Payment Issue",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Rent/Payment Issue"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "1",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "General Enquiry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "General Enquiry"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown"
+        }
+      },
+      "id": "4f3edaa6-fd28-4408-a354-d7f7dce63c15",
+      "name": "Switch - Route By AI Category",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        3008,
+        1888
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appfolio.com/api/v1/maintenance_requests",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"phone\": $json.callerPhone, \"caller_name\": $json.callerName, \"source\": \"RingCentral\", \"priority\": \"high\", \"description\": $json.summary + \"\\n\\nTranscription: \" + $json.transcriptionText + \"\\nCall ID: \" + $json.callId, \"sla_deadline\": $json.slaDeadline, \"created_at\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "73c229d6-67f4-4713-9cbd-92b69731593e",
+      "name": "AppFolio - Create Maintenance Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3456,
+        864
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__SLACK_ADMIN_CHANNEL (e.g., C01234567)__>"
+        },
+        "text": "={{ \"🔧 *Maintenance Request*\\n*From:* \" + $(\"Code - Calculate SLA Deadline\").item.json.callerName + \" (\" + $(\"Code - Calculate SLA Deadline\").item.json.callerPhone + \")\\n*Summary:* \" + $(\"Code - Calculate SLA Deadline\").item.json.summary + \"\\n*SLA Deadline:* \" + $(\"Code - Calculate SLA Deadline\").item.json.slaDeadline + \"\\n*Confidence:* \" + ($(\"Code - Calculate SLA Deadline\").item.json.confidence * 100).toFixed(0) + \"%\" }}",
+        "otherOptions": {}
+      },
+      "id": "cb7ef9b4-6444-44a3-ac7c-2de19504f1a6",
+      "name": "Slack - Notify Maintenance",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3904,
+        720
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appfolio.com/api/v1/tasks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"type\": \"leasing_callback\", \"phone\": $json.callerPhone, \"caller_name\": $json.callerName, \"source\": \"RingCentral\", \"priority\": \"high\", \"description\": $json.summary + \"\\n\\nTranscription: \" + $json.transcriptionText + \"\\nCall ID: \" + $json.callId, \"sla_deadline\": $json.slaDeadline, \"created_at\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "1c23e5fd-e037-42b3-ac68-957f6b5b94a9",
+      "name": "AppFolio - Create Leasing Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3232,
+        1424
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__SLACK_LEASING_CHANNEL (e.g., C01234567)__>"
+        },
+        "text": "={{ \"🏠 *Leasing Enquiry*\\n*From:* \" + $(\"Code - Calculate SLA Deadline\").item.json.callerName + \" (\" + $(\"Code - Calculate SLA Deadline\").item.json.callerPhone + \")\\n*Summary:* \" + $(\"Code - Calculate SLA Deadline\").item.json.summary + \"\\n*SLA Deadline:* \" + $(\"Code - Calculate SLA Deadline\").item.json.slaDeadline + \"\\n*Confidence:* \" + ($(\"Code - Calculate SLA Deadline\").item.json.confidence * 100).toFixed(0) + \"%\" }}",
+        "otherOptions": {}
+      },
+      "id": "b8f87d8c-457f-4406-b807-47cb97878c1f",
+      "name": "Slack - Notify Leasing",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3904,
+        1136
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appfolio.com/api/v1/tasks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"type\": \"payment_callback\", \"phone\": $json.callerPhone, \"caller_name\": $json.callerName, \"source\": \"RingCentral\", \"priority\": \"medium\", \"description\": $json.summary + \"\\n\\nTranscription: \" + $json.transcriptionText + \"\\nCall ID: \" + $json.callId, \"sla_deadline\": $json.slaDeadline, \"created_at\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "ebb2cf21-762e-430b-bf9d-47c877fe1f07",
+      "name": "AppFolio - Create Payment Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3456,
+        1888
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__SLACK_MANAGER_CHANNEL (e.g., C01234567)__>"
+        },
+        "text": "={{ \"💰 *Rent/Payment Issue*\\n*From:* \" + $(\"Code - Calculate SLA Deadline\").item.json.callerName + \" (\" + $(\"Code - Calculate SLA Deadline\").item.json.callerPhone + \")\\n*Summary:* \" + $(\"Code - Calculate SLA Deadline\").item.json.summary + \"\\n*SLA Deadline:* \" + $(\"Code - Calculate SLA Deadline\").item.json.slaDeadline + \"\\n*Confidence:* \" + ($(\"Code - Calculate SLA Deadline\").item.json.confidence * 100).toFixed(0) + \"%\" }}",
+        "otherOptions": {}
+      },
+      "id": "02d65418-52b1-49fd-ae4e-f612517102e8",
+      "name": "Slack - Notify Payment",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3904,
+        1744
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appfolio.com/api/v1/tasks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"type\": \"general_callback\", \"phone\": $json.callerPhone, \"caller_name\": $json.callerName, \"source\": \"RingCentral\", \"priority\": \"low\", \"description\": $json.summary + \"\\n\\nTranscription: \" + $json.transcriptionText + \"\\nCall ID: \" + $json.callId, \"sla_deadline\": $json.slaDeadline, \"created_at\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "65c46f70-ba1c-4912-8117-aed32eb025cc",
+      "name": "AppFolio - Create General Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3680,
+        2192
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__SMS_FROM_NUMBER (e.g., +15559876543)__>",
+        "to": "={{ $(\"AppFolio - Create Maintenance Request\").item.json.phone || $(\"Code - Calculate SLA Deadline\").item.json.callerPhone }}",
+        "message": "Thanks for contacting maintenance. We received your request and someone will follow up shortly.",
+        "options": {}
+      },
+      "id": "3c20e518-5956-4e50-9b79-8f039a630e7f",
+      "name": "Twilio - Send Maintenance SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        3680,
+        800
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.rentengine.com/api/v1/leads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"property_id\": \"<__PLACEHOLDER_VALUE__RENTENGINE_PROPERTY_ID__>\", \"name\": $(\"AppFolio - Create Leasing Task\").item.json.caller_name || $(\"Code - Calculate SLA Deadline\").item.json.callerName, \"phone\": $(\"Code - Calculate SLA Deadline\").item.json.callerPhone, \"source\": \"RingCentral\", \"notes\": $(\"Code - Calculate SLA Deadline\").item.json.summary + \"\\n\\nTranscription:\\n\" + $(\"Code - Calculate SLA Deadline\").item.json.transcriptionText, \"call_id\": $(\"Code - Calculate SLA Deadline\").item.json.callId, \"assigned_rep\": \"<__PLACEHOLDER_VALUE__DEFAULT_LEASING_REP_ID__>\", \"sla_deadline\": $(\"Code - Calculate SLA Deadline\").item.json.slaDeadline } }}",
+        "options": {}
+      },
+      "id": "a8757524-d1c3-4c29-aae7-d6c8159a60f6",
+      "name": "HTTP Request - RentEngine Create Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3456,
+        1360
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__SMS_FROM_NUMBER (e.g., +15559876543)__>",
+        "to": "={{ $(\"HTTP Request - RentEngine Create Lead\").item.json.phone || $(\"Code - Calculate SLA Deadline\").item.json.callerPhone }}",
+        "message": "Thanks for your interest. A leasing specialist will follow up with you shortly.",
+        "options": {}
+      },
+      "id": "f3b11f0b-f2cc-4aed-9998-b0c8bb5c5842",
+      "name": "Twilio - Send Leasing SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        3680,
+        1200
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__SMS_FROM_NUMBER (e.g., +15559876543)__>",
+        "to": "={{ $(\"AppFolio - Create Payment Task\").item.json.phone || $(\"Code - Calculate SLA Deadline\").item.json.callerPhone }}",
+        "message": "Thanks for contacting us about your account. Our team will review this and follow up shortly.",
+        "options": {}
+      },
+      "id": "5eeec5bf-15ab-4396-9bb5-9ef2d805270c",
+      "name": "Twilio - Send Payment SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        3680,
+        1808
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__SMS_FROM_NUMBER (e.g., +15559876543)__>",
+        "to": "={{ $(\"AppFolio - Create General Task\").item.json.phone || $(\"Code - Calculate SLA Deadline\").item.json.callerPhone }}",
+        "message": "Thanks for reaching out. A member of our team will follow up shortly.",
+        "options": {}
+      },
+      "id": "5d775b37-2fe0-49e8-8bb2-e327d80af320",
+      "name": "Twilio - Send General SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        3904,
+        2272
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appfolio.com/api/v1/tasks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"type\": \"manual_review_callback\", \"phone\": $json.callerPhone, \"caller_name\": $json.callerName, \"category\": \"Unknown\", \"assigned_team\": \"admin\", \"description\": \"AI could not confidently classify this call.\\n\\nSummary: \" + $json.summary + \"\\n\\nTranscription: \" + $json.transcriptionText, \"status\": \"open\", \"due_at\": $json.slaDeadline, \"sla_deadline\": $json.slaDeadline, \"flag\": \"manual_review\" } }}",
+        "options": {}
+      },
+      "id": "65a13850-e0f2-4615-b47c-34b35b787ff7",
+      "name": "AppFolio - Create Unknown Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3680,
+        2480
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__SLACK_ADMIN_CHANNEL (e.g., C01234567)__>"
+        },
+        "text": "={{ \"⚠️ *Manual Review Needed*\\n*From:* \" + $(\"Code - Calculate SLA Deadline\").item.json.callerName + \" (\" + $(\"Code - Calculate SLA Deadline\").item.json.callerPhone + \")\\n*AI Confidence:* \" + ($(\"Code - Calculate SLA Deadline\").item.json.confidence * 100).toFixed(0) + \"%\\n*Summary:* \" + $(\"Code - Calculate SLA Deadline\").item.json.summary + \"\\n*SLA Deadline:* \" + $(\"Code - Calculate SLA Deadline\").item.json.slaDeadline }}",
+        "otherOptions": {}
+      },
+      "id": "0bfd1695-943d-4dba-a172-826a252d8a68",
+      "name": "Slack - Notify Unknown",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3904,
+        2560
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "nodeName",
+              "value": "={{ $node.name }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "errorMessage",
+              "value": "={{ $json.message || \"Unknown error\" }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "callerPhone",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "callerName",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "callId",
+              "value": "N/A",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c7d9981b-fb25-4dba-8f3b-f8e06e06a9fc",
+      "name": "Set - Error Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4128,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__ADMIN_EMAIL (e.g., admin@example.com)__>",
+        "subject": "={{ \"n8n RingCentral Workflow Error - \" + $json.nodeName }}",
+        "message": "={{ \"<h2>An error occurred in the RingCentral inbound call workflow.</h2>\" + \"<p><strong>Node:</strong> \" + $json.nodeName + \"</p>\" + \"<p><strong>Error:</strong> \" + $json.errorMessage + \"</p>\" + \"<p><strong>Caller:</strong> \" + $json.callerName + \" / \" + $json.callerPhone + \"</p>\" + \"<p><strong>Call ID:</strong> \" + $json.callId + \"</p>\" + \"<p><strong>Timestamp:</strong> \" + $now.toISO() + \"</p>\" + \"<p><strong>Workflow:</strong> RingCentral Missed Call Follow-up - Enhanced Live Inbound Handling</p>\" }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "166ffc1d-6edd-47f1-8367-03502eb54851",
+      "name": "Gmail Alert - Admin Error Handler",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        4352,
+        2000
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "b7b4b929-102a-4d56-aa47-f5e2bd4d2414",
+      "name": "Schedule Trigger - Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        2784,
+        3600
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ \"https://api.appfolio.com/api/v1/tasks?status=open&type=callback,leasing_callback,accounts_callback,general_callback,manual_review_callback&sla_deadline_before=\" + $now.toISO() }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "30e4d2e7-d422-4442-88c3-d3a82b0b6e9d",
+      "name": "AppFolio - Get Overdue Callback Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3008,
+        3600
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__SLACK_MANAGER_CHANNEL (e.g., C01234567)__>"
+        },
+        "text": "={{ \"⚠️ *Overdue Callback SLA Alert*\\n\\n*Caller:* \" + $json.caller_name + \" / \" + $json.phone + \"\\n*Category:* \" + $json.category + \"\\n*SLA Deadline:* \" + $json.sla_deadline + \"\\n*Task ID:* \" + $json.id + \"\\n\\nPlease review immediately.\" }}",
+        "otherOptions": {}
+      },
+      "id": "465e671a-30cc-4cdc-8c7b-cdd5030480fb",
+      "name": "Slack - Escalation to Manager",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3456,
+        3600
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__SMS_FROM_NUMBER (e.g., +15559876543)__>",
+        "to": "={{ $(\"Split In Batches - Each Overdue Task\").item.json.phone }}",
+        "message": "We apologize for the delay. Your request is still in our queue, and someone will be with you shortly.",
+        "options": {}
+      },
+      "id": "476ce4de-ae70-4f50-88b4-98cf1e105a0d",
+      "name": "Twilio - Send Follow-up SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        3680,
+        3632
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ \"https://api.appfolio.com/api/v1/tasks/\" + $(\"Split In Batches - Each Overdue Task\").item.json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"escalated\": true, \"escalated_at\": $now.toISO(), \"last_escalation_sms_sent_at\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "2ba3881e-87ab-42e7-a726-240db8c15938",
+      "name": "AppFolio - Mark Task Escalated",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3904,
+        3776
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "3f9ce0e0-4202-4e2e-b800-eb26552744ba",
+      "name": "Split In Batches - Each Overdue Task",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3232,
+        3680
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - RingCentral Call Event": {
+      "main": [
+        [
+          {
+            "node": "Set - Normalize Call Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Normalize Call Data": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - AppFolio Search Recent Caller Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - AppFolio Search Recent Caller Records": {
+      "main": [
+        [
+          {
+            "node": "IF - Duplicate Found Within 2 Hours",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Duplicate Found Within 2 Hours": {
+      "main": [
+        [
+          {
+            "node": "AppFolio - Log Duplicate Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code - Check Business Hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Log Duplicate Interaction": {
+      "main": [
+        [
+          {
+            "node": "Stop - Duplicate Prevented",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Check Business Hours": {
+      "main": [
+        [
+          {
+            "node": "IF - Inside Business Hours?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Inside Business Hours?": {
+      "main": [
+        [
+          {
+            "node": "Switch - Live Call Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - After Hours Call Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Live Call Status": {
+      "main": [
+        [
+          {
+            "node": "AppFolio - Upsert Contact Record (Answered)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Prepare Missed Call Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RingCentral - Fetch Voicemail Transcription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Upsert Contact Record (Answered)": {
+      "main": [
+        [
+          {
+            "node": "AppFolio - Log Answered Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RingCentral - Fetch Voicemail Transcription": {
+      "main": [
+        [
+          {
+            "node": "Set - Prepare Voicemail Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - After Hours Call Data": {
+      "main": [
+        [
+          {
+            "node": "Twilio - Send After Hours SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio - Send After Hours SMS": {
+      "main": [
+        [
+          {
+            "node": "AppFolio - Create After Hours Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Create After Hours Task": {
+      "main": [
+        [
+          {
+            "node": "Slack - Notify After Hours Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Prepare Missed Call Data": {
+      "main": [
+        [
+          {
+            "node": "Merge - Qualification Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge - Qualification Paths": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Classify Caller Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Prepare Voicemail Data": {
+      "main": [
+        [
+          {
+            "node": "Merge - Qualification Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "AI Agent - Classify Caller Intent": {
+      "main": [
+        [
+          {
+            "node": "Code - Calculate SLA Deadline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Classify Caller Intent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent - Classify Caller Intent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Calculate SLA Deadline": {
+      "main": [
+        [
+          {
+            "node": "Switch - Route By AI Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Route By AI Category": {
+      "main": [
+        [
+          {
+            "node": "AppFolio - Create Maintenance Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AppFolio - Create Leasing Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AppFolio - Create Payment Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AppFolio - Create General Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AppFolio - Create Unknown Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Create Maintenance Request": {
+      "main": [
+        [
+          {
+            "node": "Twilio - Send Maintenance SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Create Leasing Task": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - RentEngine Create Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Create Payment Task": {
+      "main": [
+        [
+          {
+            "node": "Twilio - Send Payment SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio - Send Maintenance SMS": {
+      "main": [
+        [
+          {
+            "node": "Slack - Notify Maintenance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - RentEngine Create Lead": {
+      "main": [
+        [
+          {
+            "node": "Twilio - Send Leasing SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio - Send Leasing SMS": {
+      "main": [
+        [
+          {
+            "node": "Slack - Notify Leasing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio - Send Payment SMS": {
+      "main": [
+        [
+          {
+            "node": "Slack - Notify Payment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Create General Task": {
+      "main": [
+        [
+          {
+            "node": "Twilio - Send General SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Create Unknown Task": {
+      "main": [
+        [
+          {
+            "node": "Slack - Notify Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Error Context": {
+      "main": [
+        [
+          {
+            "node": "Gmail Alert - Admin Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Log Answered Call": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Notify After Hours Call": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Notify Maintenance": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Notify Leasing": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Notify Payment": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio - Send General SMS": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Notify Unknown": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger - Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "AppFolio - Get Overdue Callback Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Get Overdue Callback Tasks": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches - Each Overdue Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Escalation to Manager": {
+      "main": [
+        [
+          {
+            "node": "Twilio - Send Follow-up SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio - Send Follow-up SMS": {
+      "main": [
+        [
+          {
+            "node": "AppFolio - Mark Task Escalated",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio - Mark Task Escalated": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches - Each Overdue Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches - Each Overdue Task": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Slack - Escalation to Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
