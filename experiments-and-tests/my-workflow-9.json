@@ -1,0 +1,219 @@
+{
+  "name": "My workflow 9",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        0
+      ],
+      "id": "316e8b4e-dfe6-454e-a455-16902bf54383",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "list",
+        "owner": {
+          "__rl": true,
+          "value": "your-username",
+          "mode": "list",
+          "cachedResultName": "your-username",
+          "cachedResultUrl": "https://github.com/your-username"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "bootcamp-storage",
+          "mode": "list",
+          "cachedResultName": "bootcamp-storage",
+          "cachedResultUrl": "https://github.com/your-username/your-repo"
+        },
+        "filePath": "practice/"
+      },
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        -208,
+        0
+      ],
+      "id": "44bced1c-e78d-4a62-9ae1-099c8249b855",
+      "name": "List files",
+      "credentials": {
+        "githubOAuth2Api": {
+          "name": "GitHub account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "__rl": true,
+          "value": "your-username",
+          "mode": "list",
+          "cachedResultName": "your-username",
+          "cachedResultUrl": "https://github.com/your-username"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "bootcamp-storage",
+          "mode": "list",
+          "cachedResultName": "bootcamp-storage",
+          "cachedResultUrl": "https://github.com/your-username/your-repo"
+        },
+        "filePath": "={{ $json.path }}",
+        "additionalParameters": {}
+      },
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "3d9e4e66-0894-4ee6-9a0d-7e8b9afb398e",
+      "name": "Get a file",
+      "credentials": {
+        "githubOAuth2Api": {
+          "name": "GitHub account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {
+          "clearNamespace": true,
+          "pineconeNamespace": "it"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "94b7baf5-f0bb-4b76-b384-03a5e2f1dbb9",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+        "pineconeApi": {
+          "name": "PineconeApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-2-preview"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        144,
+        176
+      ],
+      "id": "9d276e86-2d62-4871-99a7-0274340d4617",
+      "name": "Embeddings Google Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "name": "Google Gemini(PaLM) Api account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "options": {
+          "splitPages": true,
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "file_name",
+                "value": "={{ $json.name }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        352,
+        208
+      ],
+      "id": "63d0bdb6-8d0a-4f10-8382-26ebc51c95b7",
+      "name": "Default Data Loader"
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "List files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List files": {
+      "main": [
+        [
+          {
+            "node": "Get a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a file": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

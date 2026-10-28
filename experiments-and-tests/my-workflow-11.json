@@ -1,0 +1,425 @@
+{
+  "name": "My workflow 11",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "a066b25f-c947-4c4c-ad44-6ae9ae9716d5",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -352,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "f2db4e57-0fbf-4486-a137-a47d1136d609",
+      "name": "Read Job Tracker",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -128,
+        -80
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "1085ce83-2b6a-471c-bfd2-dc3b82c4f388",
+      "name": "Combine Sheet Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        96,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "086e4e8e-eeff-4664-9d3d-ab6999323c38",
+      "name": "Read Payments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -128,
+        112
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "dcbc0a5d-a783-45d7-863c-6e535b4dc61e",
+      "name": "Read Payroll",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -128,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobTrackerData = $('Read Job Tracker').all().map(i => i.json);\nconst paymentsData = $('Read Payments').all().map(i => i.json);\nconst payrollData = $('Read Payroll').all().map(i => i.json);\n\nconst paymentSummary = {};\npaymentsData.forEach(payment => {\n  const jobId = payment['Job ID'];\n  if (!paymentSummary[jobId]) {\n    paymentSummary[jobId] = { totalPaid: 0, lastPaymentDate: null };\n  }\n  paymentSummary[jobId].totalPaid += parseFloat(payment['Amount Paid'] || 0);\n  if (payment['Payment Date']) {\n    const paymentDate = new Date(payment['Payment Date']);\n    if (!paymentSummary[jobId].lastPaymentDate || paymentDate > paymentSummary[jobId].lastPaymentDate) {\n      paymentSummary[jobId].lastPaymentDate = payment['Payment Date'];\n    }\n  }\n});\n\nconst payrollSummary = {};\npayrollData.forEach(payroll => {\n  const jobId = payroll['Job ID'];\n  if (!payrollSummary[jobId]) {\n    payrollSummary[jobId] = { totalHours: 0, totalPay: 0, employeeCount: 0 };\n  }\n  payrollSummary[jobId].totalHours += parseFloat(payroll['Hours Worked'] || 0);\n  payrollSummary[jobId].totalPay += parseFloat(payroll['Total Pay'] || 0);\n  payrollSummary[jobId].employeeCount += 1;\n});\n\nconst results = jobTrackerData.map(job => {\n  const jobId = job['Job ID'];\n  const totalDue = parseFloat(job['Total Due'] || 0);\n  const payments = paymentSummary[jobId] || { totalPaid: 0, lastPaymentDate: null };\n  const balanceDue = totalDue - payments.totalPaid;\n  const payroll = payrollSummary[jobId] || { totalHours: 0, totalPay: 0, employeeCount: 0 };\n  \n  let paymentStatus = 'Unpaid';\n  if (balanceDue <= 0) {\n    paymentStatus = 'Paid';\n  } else if (payments.totalPaid > 0) {\n    paymentStatus = 'Partial';\n  }\n  \n  const hasChanges = true;\n  \n  return {\n    json: {\n      'Job ID': jobId,\n      'Client': job['Client'],\n      'Hours': job['Hours'],\n      'Rate': job['Rate'],\n      'Status': job['Status'],\n      'Total Due': totalDue,\n      'Total Paid': payments.totalPaid,\n      'Balance Due': balanceDue,\n      'Payment Status': paymentStatus,\n      'Last Payment Date': payments.lastPaymentDate,\n      'Payroll Hours': payroll.totalHours,\n      'Payroll Total': payroll.totalPay,\n      'Employee Count': payroll.employeeCount,\n      'Has Changes': hasChanges,\n      'Last Updated': job['Last Updated'] || new Date().toISOString()\n    }\n  };\n});\n\nreturn results;"
+      },
+      "id": "4cd133c7-4f32-4cea-ba89-70aa54fd80f3",
+      "name": "Calculate Balances & Payroll",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json[\"Has Changes\"] }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "52d0e94d-81bb-46cc-8d39-908ed02a5034",
+      "name": "Changes Detected?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        544,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "f7da45e8-3996-49c0-90e8-383e2e3b72f8",
+      "name": "Update Payments Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        768,
+        16
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "0e649809-485d-4795-9201-ce6d07218c89",
+      "name": "Update Payroll Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        992,
+        16
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "2f87bfcc-6d73-4d64-87f5-8a8d706f84bb",
+      "name": "Update Job Tracker Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1216,
+        16
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "message",
+              "value": "No changes detected in this sync cycle",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7e355740-4a74-4ae8-a8b7-78c8c9e10ff8",
+      "name": "No Changes",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        768,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=🔄 *Job Tracker Sync Complete*\n\n*Job ID:* {{ $json[\"Job ID\"] }}\n*Client:* {{ $json[\"Client\"] }}\n*Balance Due:* ${{ $json[\"Balance Due\"] }}\n*Payment Status:* {{ $json[\"Payment Status\"] }}\n*Payroll Total:* ${{ $json[\"Payroll Total\"] }}\n*Employee Count:* {{ $json[\"Employee Count\"] }}\n*Last Updated:* {{ $json[\"Last Updated\"] }}",
+        "otherOptions": {}
+      },
+      "id": "b1abec43-c2f6-429a-ae88-3864779a0b69",
+      "name": "Send Slack Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1440,
+        16
+      ]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Read Job Tracker",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Payments",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Payroll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Job Tracker": {
+      "main": [
+        [
+          {
+            "node": "Combine Sheet Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Sheet Data": {
+      "main": [
+        [
+          {
+            "node": "Calculate Balances & Payroll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Payments": {
+      "main": [
+        [
+          {
+            "node": "Combine Sheet Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Read Payroll": {
+      "main": [
+        [
+          {
+            "node": "Combine Sheet Data",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Calculate Balances & Payroll": {
+      "main": [
+        [
+          {
+            "node": "Changes Detected?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Changes Detected?": {
+      "main": [
+        [
+          {
+            "node": "Update Payments Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Changes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Payments Sheet": {
+      "main": [
+        [
+          {
+            "node": "Update Payroll Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Payroll Sheet": {
+      "main": [
+        [
+          {
+            "node": "Update Job Tracker Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Job Tracker Sheet": {
+      "main": [
+        [
+          {
+            "node": "Send Slack Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

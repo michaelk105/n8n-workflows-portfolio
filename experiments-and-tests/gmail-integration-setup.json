@@ -1,0 +1,253 @@
+{
+  "name": "Gmail Integration Setup",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Email from {{ $json.email_from }}\nSubject: {{ $json.email_subject }}\nContent: {{ $json.email_snippet }}\n\nOrder Data: {{ JSON.stringify($json.order_data) }}",
+        "options": {
+          "systemMessage": "You are an email assistant specialized in handling order-related inquiries. You have access to both the customer's email and their order details from the spreadsheet. Analyze the email content and order information to provide accurate, helpful responses about order status, shipping, and product details. Keep responses professional and concise."
+        }
+      },
+      "id": "84894b31-e5e9-4bfa-84c2-cefd8655252e",
+      "name": "Generate Email Response",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1152,
+        376
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "e73173c4-1129-4807-bfcb-5eb1b35a7681",
+      "name": "Combine Email and Order Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        704,
+        376
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "email_snippet",
+              "value": "={{ $('Watch for New Gmail Emails').item.json.snippet }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "email_subject",
+              "value": "={{ $('Watch for New Gmail Emails').item.json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "email_from",
+              "value": "={{ $('Watch for New Gmail Emails').item.json.from }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "order_data",
+              "value": "={{ JSON.stringify($(\"Fetch Orders from Excel\").item.json) }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "35915c13-9237-43f4-a4ac-924dfaa89422",
+      "name": "Format Data for Claude",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        928,
+        376
+      ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "filters": {
+          "includeSpamTrash": true,
+          "q": "in:anywhere is:unread"
+        }
+      },
+      "id": "35c145a3-6d8d-44b3-a01f-3bd47addf368",
+      "name": "Watch for New Gmail Emails",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        256,
+        376
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Re: {{ $('Watch for New Gmail Emails').item.json.subject }}",
+        "message": "={{ $('Generate Email Response').item.json.output }}",
+        "options": {}
+      },
+      "id": "19cbbbc4-bfc3-435a-b4a1-e55e91944189",
+      "name": "Save as Gmail Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1504,
+        376
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "options": {}
+      },
+      "id": "e76a3a05-44ff-465c-a1f6-ffc31cb728a1",
+      "name": "Fetch Orders from Excel",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        480,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1224,
+        600
+      ],
+      "id": "9d29594d-8088-4c13-81ad-9b41bf15cdbd",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "name": "Google Gemini(PaLM) Api account 7"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Generate Email Response": {
+      "main": [
+        [
+          {
+            "node": "Save as Gmail Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Email and Order Data": {
+      "main": [
+        [
+          {
+            "node": "Format Data for Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Data for Claude": {
+      "main": [
+        [
+          {
+            "node": "Generate Email Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Watch for New Gmail Emails": {
+      "main": [
+        [
+          {
+            "node": "Combine Email and Order Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Orders from Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Orders from Excel": {
+      "main": [
+        [
+          {
+            "node": "Combine Email and Order Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Email Response",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

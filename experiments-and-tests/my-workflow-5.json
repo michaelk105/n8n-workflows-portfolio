@@ -1,0 +1,208 @@
+{
+  "name": "My workflow 5",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "IT Service Request",
+        "formDescription": "SUBMIT YOUR ISSUE HERE",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "iSSUE DESCRIPTION"
+            },
+            {
+              "fieldLabel": "YOUR NAME"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        24
+      ],
+      "id": "4c6a25fe-3618-4772-9f45-c3b794ed859f",
+      "name": "On form submission"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "87263987-5efb-4c2e-b063-4afc62f09929",
+              "name": "ID",
+              "value": "={{ $json.submittedAt }}",
+              "type": "string"
+            },
+            {
+              "id": "b22dc5d2-c0f2-46f7-ba32-4a7398253e1f",
+              "name": "name",
+              "value": "={{ $json['YOUR NAME'] }}",
+              "type": "string"
+            },
+            {
+              "id": "b302a7b7-3721-4bed-ac77-5e8402143ea7",
+              "name": "message",
+              "value": "={{ $json['iSSUE DESCRIPTION'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        24
+      ],
+      "id": "57e30e84-a82e-4b01-8fc6-0f282bb68b38",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "owner": {
+          "__rl": true,
+          "value": "your-username",
+          "mode": "list",
+          "cachedResultName": "your-username",
+          "cachedResultUrl": "https://github.com/your-username"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "bootcamp-storage",
+          "mode": "list",
+          "cachedResultName": "bootcamp-storage",
+          "cachedResultUrl": "https://github.com/your-username/your-repo"
+        },
+        "filePath": "={{ $now.toISO() }}.json",
+        "fileContent": "={{ JSON.stringify($json, null, 2) }}",
+        "commitMessage": "New ticket created"
+      },
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        24
+      ],
+      "id": "3264b4fd-d21d-47b7-83a6-afac0b7db8ee",
+      "name": "Create a file",
+      "credentials": {
+        "githubOAuth2Api": {
+          "name": "GitHub account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Issue: no",
+        "messages": {
+          "messageValues": [
+            {},
+            {}
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        480,
+        -32
+      ],
+      "id": "8e2b359c-f65e-4f32-a6cd-309dfdcff1d4",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        520,
+        144
+      ],
+      "id": "3ec1f143-f223-4e26-84be-23525ae89639",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        640,
+        128
+      ],
+      "id": "d076d6de-4599-4e3a-8c6a-1cf17233f1f3",
+      "name": "Structured Output Parser"
+    }
+  ],
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Create a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

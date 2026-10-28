@@ -1,0 +1,217 @@
+{
+  "name": "My workflow 17",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<__PLACEHOLDER_VALUE__webhook-path (e.g., rentengine-showing-scheduled)__>",
+        "options": {}
+      },
+      "id": "2a986598-f7bb-47d4-a460-bdef73742156",
+      "name": "Showing Scheduled Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "lead_name",
+              "value": "={{ $json.body.lead_name }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "phone",
+              "value": "={{ $json.body.phone }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "email",
+              "value": "={{ $json.body.email }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "property",
+              "value": "={{ $json.body.property }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "showing_datetime",
+              "value": "={{ $json.body.showing_datetime }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "assigned_agent",
+              "value": "={{ $json.body.assigned_agent }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c2c2400d-ce1f-4aaa-aa98-f027fe57c0cd",
+      "name": "Extract Showing Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "={{ $json.phone }}",
+        "message": "=Hi {{ $json.lead_name }}, your showing for {{ $json.property }} is scheduled for {{ $json.showing_datetime }}. Reply here if you need to reschedule.",
+        "options": {}
+      },
+      "id": "f9867802-705f-47b7-9d6c-521d6fb516b3",
+      "name": "Send Showing Reminder",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "lead_phone",
+              "keyValue": "={{ $('Extract Showing Details').item.json.phone }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "task_title": "=Prepare for scheduled showing",
+            "lead_name": "={{ $('Extract Showing Details').item.json.lead_name }}",
+            "lead_phone": "={{ $('Extract Showing Details').item.json.phone }}",
+            "property": "={{ $('Extract Showing Details').item.json.property }}",
+            "showing_datetime": "={{ $('Extract Showing Details').item.json.showing_datetime }}",
+            "assigned_rep": "={{ $('Extract Showing Details').item.json.assigned_agent }}",
+            "status": "Open",
+            "priority": "High",
+            "due_time": "={{ DateTime.fromISO($('Extract Showing Details').item.json.showing_datetime).minus(1, \"hour\").toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "004b7ce4-8917-45dc-888d-85b96b2a6c57",
+      "name": "Create Showing Prep Task",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=📅 *Showing Scheduled*\n\n*Lead:* {{ $json.lead_name }}\n*Property:* {{ $json.property }}\n*Date/Time:* {{ $json.showing_datetime }}\n*Phone:* {{ $json.phone }}\n*Assigned Agent:* {{ $json.assigned_agent }}\n\n✅ Preparation task created - Due 1 hour before showing",
+        "otherOptions": {}
+      },
+      "id": "b97f07ca-d800-4f2c-b9e0-347bcb4b69a0",
+      "name": "Notify Assigned Agent",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        896,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Workflow 3: Showing Scheduled\n\n**Trigger:** Webhook receives showing event\n\n**Steps:**\n1. Extract showing details\n2. Send SMS confirmation to lead\n3. Create showing prep task (due 1h before)\n4. Notify assigned agent via Slack",
+        "height": 400,
+        "width": 900,
+        "color": 4
+      },
+      "id": "3c3ad905-9c9f-4ee2-a89f-a2756bf61eb0",
+      "name": "Sticky Note fe9514aa",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        144
+      ]
+    }
+  ],
+  "connections": {
+    "Showing Scheduled Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Showing Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Showing Details": {
+      "main": [
+        [
+          {
+            "node": "Send Showing Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Showing Reminder": {
+      "main": [
+        [
+          {
+            "node": "Create Showing Prep Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Showing Prep Task": {
+      "main": [
+        [
+          {
+            "node": "Notify Assigned Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

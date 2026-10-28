@@ -1,0 +1,579 @@
+{
+  "name": "My workflow 15",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<__PLACEHOLDER_VALUE__webhook-path (e.g., rentengine-new-lead)__>",
+        "options": {}
+      },
+      "id": "4be77f89-f592-4b6f-a6b4-323b4416bb11",
+      "name": "New Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1808,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "leftValue": "={{ $json.body.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fbf50e2e-ce62-4719-9042-79f723e9fb74",
+      "name": "Validate Lead Data",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1584,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "lead_name",
+              "value": "={{ $json.body.lead_name }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "phone",
+              "value": "={{ $json.body.phone }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "email",
+              "value": "={{ $json.body.email }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "property",
+              "value": "={{ $json.body.property_of_interest }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "move_in_date",
+              "value": "={{ $json.body.move_in_date }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "lead_source",
+              "value": "={{ $json.body.lead_source }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "timestamp",
+              "value": "={{ $json.body.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "lead_status",
+              "value": "={{ $json.body.lead_status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3355c1ea-3610-4101-b3b7-dcdfb1543562",
+      "name": "Extract Lead Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1360,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "phone",
+              "keyValue": "={{ $json.phone }}"
+            },
+            {
+              "keyName": "email",
+              "keyValue": "={{ $json.email }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "bc6129a3-c749-4555-bd93-41b7b2b7a0e2",
+      "name": "Check for Duplicates",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1136,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $(\"Check for Duplicates\").all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b4187aba-e03d-4f5c-8fcb-2253ece49231",
+      "name": "Is New Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -912,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "assigned_rep",
+              "value": "<__PLACEHOLDER_VALUE__Rep assignment logic (e.g., \"Sarah Johnson\")__>",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "rep_email",
+              "value": "<__PLACEHOLDER_VALUE__Rep email (e.g., \"sarah@property.com\")__>",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "rep_phone",
+              "value": "<__PLACEHOLDER_VALUE__Rep phone (e.g., \"+15559876543\")__>",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "2046a079-b253-402f-b58c-ab0f150c4d9b",
+      "name": "Assign Leasing Rep",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -688,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "={{ $json.phone }}",
+        "message": "=Hi {{ $json.lead_name }}, thanks for your interest in {{ $json.property }}. A member of our leasing team will follow up shortly. What is your preferred move-in date?",
+        "options": {}
+      },
+      "id": "f7f4b622-9fb4-4867-8efb-411d30be092a",
+      "name": "Send Welcome SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        -16
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "lead_phone",
+              "keyValue": "={{ $('Assign Leasing Rep').item.json.phone }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "task_title": "=Follow up with new leasing lead",
+            "lead_name": "={{ $('Assign Leasing Rep').item.json.lead_name }}",
+            "lead_phone": "={{ $('Assign Leasing Rep').item.json.phone }}",
+            "lead_email": "={{ $('Assign Leasing Rep').item.json.email }}",
+            "property": "={{ $('Assign Leasing Rep').item.json.property }}",
+            "assigned_rep": "={{ $('Assign Leasing Rep').item.json.assigned_rep }}",
+            "status": "Open",
+            "priority": "High",
+            "due_time": "={{ $now.plus(15, \"minutes\").toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "a9b9be01-12b5-444e-9f4b-c3738d39a878",
+      "name": "Create Callback Task",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -240,
+        80
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=🏠 *New Leasing Lead Received*\n\n*Lead:* {{ $json.lead_name }}\n*Property:* {{ $json.property }}\n*Phone:* {{ $json.phone }}\n*Email:* {{ $json.email }}\n*Move-in Date:* {{ $json.move_in_date }}\n*Source:* {{ $json.lead_source }}\n*Assigned to:* {{ $json.assigned_rep }}\n\n✅ Callback task created - Due in 15 minutes",
+        "otherOptions": {}
+      },
+      "id": "84493bae-0dcb-4f3d-83ed-7b9d4c3df93a",
+      "name": "Notify Leasing Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        -16,
+        176
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=⚠️ *SMS Send Failed*\n\nLead: {{ $(\"Assign Leasing Rep\").item.json.lead_name }}\nPhone: {{ $(\"Assign Leasing Rep\").item.json.phone }}\nError: SMS delivery failed",
+        "otherOptions": {}
+      },
+      "id": "d33ab710-4b0d-4fb9-bc49-b32790d79653",
+      "name": "Alert SMS Failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        -240,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=⚠️ *Task Creation Failed*\n\nLead: {{ $(\"Assign Leasing Rep\").item.json.lead_name }}\nError: Task creation failed",
+        "otherOptions": {}
+      },
+      "id": "e64eec1e-0222-49fc-b39b-dad4c464d32e",
+      "name": "Alert Task Failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        -16,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=⚠️ *Staff Notification Failed*\n\nLead: {{ $(\"Assign Leasing Rep\").item.json.lead_name }}\nError: Notification delivery failed",
+        "otherOptions": {}
+      },
+      "id": "bacc1997-0f14-4b0c-9c80-9f4fda719aa9",
+      "name": "Alert Notification Failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        208,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "message",
+              "value": "Duplicate lead ignored",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "lead_name",
+              "value": "={{ $(\"Extract Lead Data\").item.json.lead_name }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "phone",
+              "value": "={{ $(\"Extract Lead Data\").item.json.phone }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7cc2c45d-bcc0-4b96-a9ab-8f1dfcfe91e7",
+      "name": "Log Duplicate Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -688,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "error",
+              "value": "Lead validation failed - missing phone and email",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "lead_data",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bf59933c-ae30-4d0d-b151-f20e0d4d77d9",
+      "name": "Log Invalid Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1360,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Workflow 1: New Lead Intake\n\n**Trigger:** Webhook receives lead data from RentEngine\n\n**Steps:**\n1. Validate lead has phone or email\n2. Check for duplicates in data table\n3. Assign leasing rep (round-robin)\n4. Send welcome SMS to lead\n5. Create callback task (due in 15 min)\n6. Notify leasing team via Slack\n\n**Error Handling:**\n- Invalid leads are logged\n- Duplicates are ignored\n- SMS/task/notification failures alert admin",
+        "height": 400,
+        "width": 1800,
+        "color": 2
+      },
+      "id": "d5ec87dc-2f76-4b0e-a5d2-c5400841f542",
+      "name": "Sticky Note 90a06e74",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1920,
+        -176
+      ]
+    }
+  ],
+  "connections": {
+    "New Lead Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Extract Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Invalid Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Check for Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Is New Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Lead?": {
+      "main": [
+        [
+          {
+            "node": "Assign Leasing Rep",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Duplicate Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign Leasing Rep": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Welcome SMS": {
+      "main": [
+        [
+          {
+            "node": "Create Callback Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert SMS Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Callback Task": {
+      "main": [
+        [
+          {
+            "node": "Notify Leasing Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Task Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Leasing Team": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Alert Notification Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

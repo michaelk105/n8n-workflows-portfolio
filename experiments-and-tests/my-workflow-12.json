@@ -1,0 +1,10 @@
+{
+  "name": "My workflow 12",
+  "nodes": [],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

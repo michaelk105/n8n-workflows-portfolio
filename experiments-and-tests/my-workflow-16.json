@@ -1,0 +1,193 @@
+{
+  "name": "My workflow 16",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "id": "989ff84e-08d1-43ec-9c18-2fe481a3cbc8",
+      "name": "Check Stale Leads Every 4 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        432,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "keyValue": "Open"
+            },
+            {
+              "keyName": "updatedAt",
+              "condition": "lt",
+              "keyValue": "={{ $now.minus(24, \"hours\").toISO() }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "d3b1290a-f130-4a7c-8b96-d1e2b6dfc487",
+      "name": "Fetch Stale Leads",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        656,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "Stale - Follow Up Needed"
+          }
+        },
+        "options": {}
+      },
+      "id": "66ea66aa-1415-40b5-bc9c-87827fc62bf6",
+      "name": "Mark Lead as Stale",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number__>",
+        "to": "={{ $('Mark Lead as Stale').item.json.lead_phone }}",
+        "message": "=Hi {{ $('Mark Lead as Stale').item.json.lead_name }}, just following up on your interest in {{ $('Mark Lead as Stale').item.json.property }}. Are you still looking for a place?",
+        "options": {}
+      },
+      "id": "fb795067-0620-4753-973a-b485896a857a",
+      "name": "Send Follow-up SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=⏰ *Stale Lead Alert*\n\n*Lead:* {{ $('Mark Lead as Stale').item.json.lead_name }}\n*Property:* {{ $('Mark Lead as Stale').item.json.property }}\n*Phone:* {{ $('Mark Lead as Stale').item.json.lead_phone }}\n*Assigned to:* {{ $('Mark Lead as Stale').item.json.assigned_rep }}\n*Status:* No response in 24 hours\n\n🔍 Manager review recommended",
+        "otherOptions": {}
+      },
+      "id": "4de71ae5-3423-4f45-bf00-5a7c5d303125",
+      "name": "Notify Leasing Manager",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1328,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Workflow 2: Lead Stops Responding\n\n**Trigger:** Schedule (every 4 hours)\n\n**Steps:**\n1. Fetch leads with status=Open and no update in 24h\n2. Mark leads as \"Stale - Follow Up Needed\"\n3. Send follow-up SMS to lead\n4. Notify leasing manager for review",
+        "height": 200,
+        "width": 1500,
+        "color": 3
+      },
+      "id": "2b66ca3d-8648-47f4-82ea-cc3f52d5e0e3",
+      "name": "Sticky Note d658b302",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        64
+      ]
+    }
+  ],
+  "connections": {
+    "Check Stale Leads Every 4 Hours": {
+      "main": [
+        [
+          {
+            "node": "Fetch Stale Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Stale Leads": {
+      "main": [
+        [
+          {
+            "node": "Mark Lead as Stale",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Lead as Stale": {
+      "main": [
+        [
+          {
+            "node": "Send Follow-up SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Follow-up SMS": {
+      "main": [
+        [
+          {
+            "node": "Notify Leasing Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

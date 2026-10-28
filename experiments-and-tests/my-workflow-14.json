@@ -1,0 +1,1357 @@
+{
+  "name": "My workflow 14",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "roofing-lead-intake",
+        "options": {
+          "responseData": "={{ { \"status\": \"received\", \"message\": \"Lead captured successfully\" } }}"
+        }
+      },
+      "id": "47af742d-aa28-4602-bff6-3f59d149deee",
+      "name": "Inbound Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1248,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "source",
+              "value": "={{ $json.body.source || \"Unknown\" }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "full_name",
+              "value": "={{ $json.body.full_name || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "phone",
+              "value": "={{ $json.body.phone || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "email",
+              "value": "={{ $json.body.email || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "city",
+              "value": "={{ $json.body.city || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "address",
+              "value": "={{ $json.body.address || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "job_type",
+              "value": "={{ $json.body.job_type || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "roof_issue_description",
+              "value": "={{ $json.body.roof_issue_description || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "active_damage",
+              "value": "={{ $json.body.active_damage || \"no\" }}",
+              "type": "string"
+            },
+            {
+              "id": "11",
+              "name": "emergency_keywords_detected",
+              "value": "={{ $json.body.emergency_keywords_detected || \"no\" }}",
+              "type": "string"
+            },
+            {
+              "id": "12",
+              "name": "insurance_claim",
+              "value": "={{ $json.body.insurance_claim || \"no\" }}",
+              "type": "string"
+            },
+            {
+              "id": "13",
+              "name": "ready_now",
+              "value": "={{ $json.body.ready_now || \"no\" }}",
+              "type": "string"
+            },
+            {
+              "id": "14",
+              "name": "preferred_appointment_time",
+              "value": "={{ $json.body.preferred_appointment_time || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "15",
+              "name": "urgency_score",
+              "value": "={{ $json.body.urgency_score || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "16",
+              "name": "notes",
+              "value": "={{ $json.body.notes || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "17",
+              "name": "call_summary",
+              "value": "={{ $json.body.call_summary || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "18",
+              "name": "transcript_url",
+              "value": "={{ $json.body.transcript_url || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "19",
+              "name": "vapi_call_id",
+              "value": "={{ $json.body.vapi_call_id || \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "59ae8903-c1e7-4ac2-86d3-aeefe5db2ab0",
+      "name": "Normalize Lead Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1024,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const emergencyKeywords = [\n  'leak', 'leaking', 'water coming in', 'tarp', 'storm damage',\n  'tree fell', 'ceiling collapse', 'hail damage', 'active rain damage',\n  'urgent', 'emergency'\n];\n\nconst description = ($json.roof_issue_description || '').toLowerCase();\nconst notes = ($json.notes || '').toLowerCase();\nconst summary = ($json.call_summary || '').toLowerCase();\n\nconst combinedText = description + ' ' + notes + ' ' + summary;\n\nconst hasEmergencyKeyword = emergencyKeywords.some(keyword => \n  combinedText.includes(keyword.toLowerCase())\n);\n\nreturn {\n  ...($json),\n  emergency_keywords_detected: hasEmergencyKeyword ? 'yes' : $json.emergency_keywords_detected\n};"
+      },
+      "id": "217e1bfe-2708-4e06-a05b-df4864476efa",
+      "name": "Detect Emergency Keywords",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const activeDamage = ($json.active_damage || '').toLowerCase() === 'yes';\nconst emergencyKeywords = ($json.emergency_keywords_detected || '').toLowerCase() === 'yes';\nconst urgencyScore = parseInt($json.urgency_score) || 0;\n\nlet branch = 'Cold';\n\nif (activeDamage || emergencyKeywords || urgencyScore >= 9) {\n  branch = 'Emergency';\n} else if (urgencyScore >= 7) {\n  branch = 'Hot';\n} else if (urgencyScore >= 4) {\n  branch = 'Warm';\n}\n\nreturn {\n  ...($json),\n  branch: branch\n};"
+      },
+      "id": "01167b83-142e-4652-9cb5-4fd7f761017d",
+      "name": "Determine Branch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.branch }}",
+                    "rightValue": "Emergency",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Emergency"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.branch }}",
+                    "rightValue": "Hot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Hot"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.branch }}",
+                    "rightValue": "Warm",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Warm"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Cold"
+        }
+      },
+      "id": "6e5179e7-0573-4281-ad41-feace91c13d4",
+      "name": "Route by Branch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -352,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__JobNimbus API URL (e.g., https://app.jobnimbus.com/api1/contacts)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"display_name\": $json.full_name, \"first_name\": $json.full_name.split(\" \")[0], \"last_name\": $json.full_name.split(\" \")[1] || \"\", \"email\": $json.email, \"phone\": $json.phone, \"address_line1\": $json.address, \"city\": $json.city, \"tags\": [\"EMERGENCY\"], \"status_name\": \"New Lead\", \"record_type_name\": \"Contact\", \"custom_fields\": { \"source\": $json.source, \"urgency_score\": $json.urgency_score, \"job_type\": $json.job_type, \"roof_issue\": $json.roof_issue_description, \"insurance_claim\": $json.insurance_claim, \"vapi_call_id\": $json.vapi_call_id } } }}",
+        "options": {}
+      },
+      "id": "5c48671d-12da-413a-98c3-d54093b9cb78",
+      "name": "Create JobNimbus Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -128,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "<__PLACEHOLDER_VALUE__Team phone number (e.g., +15559876543)__>",
+        "message": "={{ \"🚨 EMERGENCY LEAD ALERT\\n\\nName: \" + $json.full_name + \"\\nPhone: \" + $json.phone + \"\\nIssue: \" + $json.roof_issue_description + \"\\nUrgency: \" + $json.urgency_score + \"/10\\n\\nAction Required: Contact immediately!\" }}",
+        "options": {}
+      },
+      "id": "e470012a-d9c1-4862-951a-b92becb73e37",
+      "name": "Send Team SMS Alert",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        96,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Team email (e.g., emergency@roofingcompany.com)__>",
+        "subject": "={{ \"🚨 EMERGENCY LEAD: \" + $(\"Determine Branch\").item.json.full_name + \" - \" + $(\"Determine Branch\").item.json.city }}",
+        "message": "={{ \"<h2>Emergency Roofing Lead</h2><p><strong>Name:</strong> \" + $(\"Determine Branch\").item.json.full_name + \"</p><p><strong>Phone:</strong> \" + $(\"Determine Branch\").item.json.phone + \"</p><p><strong>Email:</strong> \" + $(\"Determine Branch\").item.json.email + \"</p><p><strong>Address:</strong> \" + $(\"Determine Branch\").item.json.address + \", \" + $(\"Determine Branch\").item.json.city + \"</p><p><strong>Issue:</strong> \" + $(\"Determine Branch\").item.json.roof_issue_description + \"</p><p><strong>Urgency Score:</strong> \" + $(\"Determine Branch\").item.json.urgency_score + \"/10</p><p><strong>Active Damage:</strong> \" + $(\"Determine Branch\").item.json.active_damage + \"</p><p><strong>Insurance Claim:</strong> \" + $(\"Determine Branch\").item.json.insurance_claim + \"</p><p><strong>Source:</strong> \" + $(\"Determine Branch\").item.json.source + \"</p><p><strong>Call Summary:</strong> \" + $(\"Determine Branch\").item.json.call_summary + \"</p><p><strong>Notes:</strong> \" + $(\"Determine Branch\").item.json.notes + \"</p><hr><p style=\\\"color: red;\\\"><strong>ACTION REQUIRED: Contact customer immediately!</strong></p>\" }}",
+        "options": {}
+      },
+      "id": "8820a9b4-6d63-4da2-b2cc-3ac4624b02d9",
+      "name": "Send Team Email Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -64
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "e9397f6c-08ae-4c0b-b875-221ecdda6fe3",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        544,
+        -64
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $(\"Determine Branch\").item.json.phone }}",
+        "message": "={{ \"Thank you for contacting us, \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \"! Our emergency roofing team has been alerted about your \" + $(\"Determine Branch\").item.json.job_type.toLowerCase() + \" request. We will contact you shortly to schedule an immediate inspection. For urgent matters, call us at [YOUR PHONE]. - [YOUR COMPANY]\" }}",
+        "options": {}
+      },
+      "id": "75ade3ce-bd85-47a7-8949-1edaaabd0f52",
+      "name": "Send Customer Confirmation SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        768,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__JobNimbus API URL (e.g., https://app.jobnimbus.com/api1/contacts)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"display_name\": $json.full_name, \"first_name\": $json.full_name.split(\" \")[0], \"last_name\": $json.full_name.split(\" \")[1] || \"\", \"email\": $json.email, \"phone\": $json.phone, \"address_line1\": $json.address, \"city\": $json.city, \"tags\": [\"HOT\", \"INSURANCE CLAIM\"], \"status_name\": \"New Lead\", \"record_type_name\": \"Contact\", \"custom_fields\": { \"source\": $json.source, \"urgency_score\": $json.urgency_score, \"job_type\": $json.job_type, \"roof_issue\": $json.roof_issue_description, \"insurance_claim\": $json.insurance_claim, \"ready_now\": $json.ready_now, \"vapi_call_id\": $json.vapi_call_id } } }}",
+        "options": {}
+      },
+      "id": "5c8857b4-30f0-44f7-8b76-0a76fb9b5f64",
+      "name": "Create JobNimbus Hot Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -128,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "start": "={{ $(\"Determine Branch\").item.json.preferred_appointment_time || $now.plus(1, \"day\").set({ hour: 9, minute: 0 }).toISO() }}",
+        "end": "={{ $(\"Determine Branch\").item.json.preferred_appointment_time ? $now.fromISO($(\"Determine Branch\").item.json.preferred_appointment_time).plus(1, \"hour\").toISO() : $now.plus(1, \"day\").set({ hour: 10, minute: 0 }).toISO() }}",
+        "additionalFields": {
+          "attendees": [
+            "={{ $(\"Determine Branch\").item.json.email }}"
+          ],
+          "description": "={{ \"Insurance Claim Inspection\\n\\nCustomer: \" + $(\"Determine Branch\").item.json.full_name + \"\\nPhone: \" + $(\"Determine Branch\").item.json.phone + \"\\nAddress: \" + $(\"Determine Branch\").item.json.address + \", \" + $(\"Determine Branch\").item.json.city + \"\\n\\nJob Type: \" + $(\"Determine Branch\").item.json.job_type + \"\\nIssue: \" + $(\"Determine Branch\").item.json.roof_issue_description + \"\\n\\nSource: \" + $(\"Determine Branch\").item.json.source }}",
+          "location": "={{ $(\"Determine Branch\").item.json.address + \", \" + $(\"Determine Branch\").item.json.city }}",
+          "summary": "={{ \"Roofing Inspection - \" + $(\"Determine Branch\").item.json.full_name }}"
+        }
+      },
+      "id": "b6b3e5ea-e49f-48e8-a73e-af2f67078e73",
+      "name": "Create Calendar Appointment",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        96,
+        128
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "name": "Google Calendar OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $(\"Determine Branch\").item.json.phone }}",
+        "message": "={{ \"Hi \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \"! Your roofing inspection is scheduled for \" + $json.start.dateTime.split(\"T\")[0] + \" at \" + $now.fromISO($json.start.dateTime).toFormat(\"h:mm a\") + \". Address: \" + $(\"Determine Branch\").item.json.address + \". View details: \" + $json.htmlLink + \" - [YOUR COMPANY]\" }}",
+        "options": {}
+      },
+      "id": "1059ab4b-9590-4934-af4e-2169a02e05fe",
+      "name": "Send Customer SMS Confirmation",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        320,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "<__PLACEHOLDER_VALUE__Estimator phone number (e.g., +15559876543)__>",
+        "message": "={{ \"📋 HOT LEAD - Insurance Claim\\n\\nName: \" + $(\"Determine Branch\").item.json.full_name + \"\\nPhone: \" + $(\"Determine Branch\").item.json.phone + \"\\nAddress: \" + $(\"Determine Branch\").item.json.address + \", \" + $(\"Determine Branch\").item.json.city + \"\\n\\nAppointment: \" + $now.fromISO($(\"Create Calendar Appointment\").item.json.start.dateTime).toFormat(\"MMM d, h:mm a\") + \"\\n\\nJob: \" + $(\"Determine Branch\").item.json.job_type + \"\\nIssue: \" + $(\"Determine Branch\").item.json.roof_issue_description }}",
+        "options": {}
+      },
+      "id": "0b80c29a-a7b2-4ab6-8c2e-6fd8d5b9e69f",
+      "name": "Send Estimator SMS Alert",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        544,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Estimator email (e.g., estimator@roofingcompany.com)__>",
+        "subject": "={{ \"📋 HOT LEAD - Insurance Claim: \" + $(\"Determine Branch\").item.json.full_name + \" - \" + $(\"Determine Branch\").item.json.city }}",
+        "message": "={{ \"<h2>Hot Lead - Insurance Claim</h2><p><strong>Name:</strong> \" + $(\"Determine Branch\").item.json.full_name + \"</p><p><strong>Phone:</strong> \" + $(\"Determine Branch\").item.json.phone + \"</p><p><strong>Email:</strong> \" + $(\"Determine Branch\").item.json.email + \"</p><p><strong>Address:</strong> \" + $(\"Determine Branch\").item.json.address + \", \" + $(\"Determine Branch\").item.json.city + \"</p><p><strong>Job Type:</strong> \" + $(\"Determine Branch\").item.json.job_type + \"</p><p><strong>Issue:</strong> \" + $(\"Determine Branch\").item.json.roof_issue_description + \"</p><p><strong>Insurance Claim:</strong> \" + $(\"Determine Branch\").item.json.insurance_claim + \"</p><p><strong>Ready Now:</strong> \" + $(\"Determine Branch\").item.json.ready_now + \"</p><p><strong>Urgency Score:</strong> \" + $(\"Determine Branch\").item.json.urgency_score + \"/10</p><p><strong>Source:</strong> \" + $(\"Determine Branch\").item.json.source + \"</p><hr><p><strong>Appointment Scheduled:</strong></p><p>Date/Time: \" + $now.fromISO($(\"Create Calendar Appointment\").item.json.start.dateTime).toFormat(\"MMMM d, yyyy h:mm a\") + \"</p><p>Calendar Link: <a href=\\\"\" + $(\"Create Calendar Appointment\").item.json.htmlLink + \"\\\">View in Google Calendar</a></p>\" }}",
+        "options": {}
+      },
+      "id": "5ffdaa68-55b2-4890-b855-6366f61489ad",
+      "name": "Send Estimator Email Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        128
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__JobNimbus Tasks API URL (e.g., https://app.jobnimbus.com/api1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"title\": \"Follow up - Insurance Claim Inspection\", \"description\": \"Prepare for inspection appointment with \" + $(\"Determine Branch\").item.json.full_name + \". Review insurance claim details and bring necessary documentation.\", \"due_date\": $now.fromISO($(\"Create Calendar Appointment\").item.json.start.dateTime).minus(1, \"day\").toISO(), \"priority\": \"high\", \"related_to\": $(\"Create JobNimbus Hot Lead\").item.json.jnid, \"assigned_to\": \"estimator\" } }}",
+        "options": {}
+      },
+      "id": "c6971211-a854-4c29-bf34-7ed41b4c698b",
+      "name": "Create JobNimbus Follow-Up Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        992,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "28ace2c4-0b78-4f64-87e7-eb060b438322",
+      "name": "Log Hot Lead to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1248,
+        352
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "appointment_booked",
+              "value": "yes",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "appointment_time",
+              "value": "={{ $(\"Create Calendar Appointment\").item.json.start.dateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "calendar_link",
+              "value": "={{ $(\"Create Calendar Appointment\").item.json.htmlLink }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "bee40ec5-390b-49f8-befa-cdd296e778b1",
+      "name": "Mark Appointment Booked",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1024,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__JobNimbus API URL (e.g., https://app.jobnimbus.com/api1/contacts)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"display_name\": $json.full_name, \"first_name\": $json.full_name.split(\" \")[0], \"last_name\": $json.full_name.split(\" \")[1] || \"\", \"email\": $json.email, \"phone\": $json.phone, \"address_line1\": $json.address, \"city\": $json.city, \"tags\": [\"WARM\"], \"status_name\": \"New Lead\", \"record_type_name\": \"Contact\", \"custom_fields\": { \"source\": $json.source, \"urgency_score\": $json.urgency_score, \"job_type\": $json.job_type, \"roof_issue\": $json.roof_issue_description, \"insurance_claim\": $json.insurance_claim, \"ready_now\": $json.ready_now, \"vapi_call_id\": $json.vapi_call_id } } }}",
+        "options": {}
+      },
+      "id": "bfb73ee6-bae8-4ce2-84e0-4a4d555bd03e",
+      "name": "Create JobNimbus Warm Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -128,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__JobNimbus Tasks API URL (e.g., https://app.jobnimbus.com/api1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"title\": \"Follow up - Warm Lead\", \"description\": \"Contact \" + $(\"Determine Branch\").item.json.full_name + \" regarding their \" + $(\"Determine Branch\").item.json.job_type + \" inquiry. Customer is interested but not urgent.\", \"due_date\": $now.plus(2, \"hours\").toISO(), \"priority\": \"medium\", \"related_to\": $(\"Create JobNimbus Warm Lead\").item.json.jnid, \"assigned_to\": \"team\" } }}",
+        "options": {}
+      },
+      "id": "eae6ff83-c31f-423b-ad39-593ae31c8bf4",
+      "name": "Create Warm Follow-Up Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        96,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Team email (e.g., team@roofingcompany.com)__>",
+        "subject": "={{ \"New Warm Lead: \" + $(\"Determine Branch\").item.json.full_name + \" - \" + $(\"Determine Branch\").item.json.city }}",
+        "message": "={{ \"<h2>Warm Lead - Follow-Up Required</h2><p><strong>Name:</strong> \" + $(\"Determine Branch\").item.json.full_name + \"</p><p><strong>Phone:</strong> \" + $(\"Determine Branch\").item.json.phone + \"</p><p><strong>Email:</strong> \" + $(\"Determine Branch\").item.json.email + \"</p><p><strong>Address:</strong> \" + $(\"Determine Branch\").item.json.address + \", \" + $(\"Determine Branch\").item.json.city + \"</p><p><strong>Job Type:</strong> \" + $(\"Determine Branch\").item.json.job_type + \"</p><p><strong>Issue:</strong> \" + $(\"Determine Branch\").item.json.roof_issue_description + \"</p><p><strong>Urgency Score:</strong> \" + $(\"Determine Branch\").item.json.urgency_score + \"/10</p><p><strong>Ready Now:</strong> \" + $(\"Determine Branch\").item.json.ready_now + \"</p><p><strong>Source:</strong> \" + $(\"Determine Branch\").item.json.source + \"</p><hr><p><strong>Action:</strong> Follow up in 2 hours to schedule appointment.</p>\" }}",
+        "options": {}
+      },
+      "id": "24312b93-3a11-4868-aad0-8b7f96bbe2bc",
+      "name": "Send Team Warm Notification",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        320
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "hours"
+      },
+      "id": "693ab327-8967-47c9-9723-b277081a8a4a",
+      "name": "Wait 2 Hours",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        544,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $(\"Determine Branch\").item.json.phone }}",
+        "message": "={{ \"Hi \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \"! Thanks for your interest in our roofing services. We'd love to schedule a free inspection for your \" + $(\"Determine Branch\").item.json.job_type.toLowerCase() + \". When would be a good time for you? Reply or call us at [YOUR PHONE]. - [YOUR COMPANY]\" }}",
+        "options": {}
+      },
+      "id": "87eab634-f605-48b6-ac74-02fc8b7a2e3b",
+      "name": "Send Customer Warm SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        768,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "ed29b2f0-9100-473b-a8e5-ede330e0ae23",
+      "name": "Log Warm Lead to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        992,
+        320
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "appointment_booked",
+              "value": "no",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "follow_up_scheduled",
+              "value": "yes",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "follow_up_time",
+              "value": "={{ $now.plus(2, \"hours\").toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "1837d6a7-0d79-43b6-bfbf-971a536f934a",
+      "name": "Mark No Appointment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1216,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__JobNimbus API URL (e.g., https://app.jobnimbus.com/api1/contacts)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"display_name\": $json.full_name, \"first_name\": $json.full_name.split(\" \")[0], \"last_name\": $json.full_name.split(\" \")[1] || \"\", \"email\": $json.email, \"phone\": $json.phone, \"address_line1\": $json.address, \"city\": $json.city, \"tags\": [\"COLD\", \"NURTURE\"], \"status_name\": \"New Lead\", \"record_type_name\": \"Contact\", \"custom_fields\": { \"source\": $json.source, \"urgency_score\": $json.urgency_score, \"job_type\": $json.job_type, \"roof_issue\": $json.roof_issue_description, \"insurance_claim\": $json.insurance_claim, \"ready_now\": $json.ready_now, \"vapi_call_id\": $json.vapi_call_id } } }}",
+        "options": {}
+      },
+      "id": "450a5ed6-8492-4644-8d51-729fd2e9e088",
+      "name": "Create JobNimbus Cold Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -128,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "beb4ae29-4bb7-499e-880a-d1a55d76f6bf",
+      "name": "Log Cold Lead to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        96,
+        512
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $(\"Determine Branch\").item.json.phone }}",
+        "message": "={{ \"Hi \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \"! Thanks for reaching out about roofing services. We're here when you're ready. We specialize in \" + $(\"Determine Branch\").item.json.job_type.toLowerCase() + \" and offer free inspections. - [YOUR COMPANY]\" }}",
+        "options": {}
+      },
+      "id": "21021502-d345-4aa9-a495-682a3b30d294",
+      "name": "Send Day 1 SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        320,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $(\"Determine Branch\").item.json.email }}",
+        "subject": "={{ \"Welcome \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \" - Your Roofing Partner\" }}",
+        "message": "={{ \"<h2>Welcome to [YOUR COMPANY]</h2><p>Hi \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \",</p><p>Thank you for your interest in our roofing services. We understand you're researching your options for \" + $(\"Determine Branch\").item.json.job_type.toLowerCase() + \".</p><p>Here's what sets us apart:</p><ul><li>Free, no-obligation inspections</li><li>Licensed and insured professionals</li><li>Transparent pricing</li><li>Warranty on all work</li></ul><p>We're here to help when you're ready. Feel free to reach out with any questions.</p><p>Best regards,<br>[YOUR COMPANY TEAM]</p>\" }}",
+        "options": {}
+      },
+      "id": "331ce2fa-4587-4983-a1fc-70fb59a52bc9",
+      "name": "Send Day 1 Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        544,
+        512
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "days"
+      },
+      "id": "12acf2f3-716e-4817-b89b-38d7c319a306",
+      "name": "Wait 3 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        768,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $(\"Determine Branch\").item.json.email }}",
+        "subject": "Understanding Your Roofing Options",
+        "message": "={{ \"<h2>Roofing 101: What You Need to Know</h2><p>Hi \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \",</p><p>Choosing the right roofing solution can feel overwhelming. Here are some key factors to consider:</p><h3>Types of Roofing Materials</h3><ul><li><strong>Asphalt Shingles:</strong> Affordable and durable (20-30 years)</li><li><strong>Metal Roofing:</strong> Long-lasting and energy-efficient (40-70 years)</li><li><strong>Tile:</strong> Premium option with excellent longevity (50+ years)</li></ul><h3>Signs You Need Roof Repair</h3><ul><li>Missing or damaged shingles</li><li>Water stains on ceilings</li><li>Granules in gutters</li><li>Roof age over 20 years</li></ul><p>Have questions? Reply to this email or call us at [YOUR PHONE].</p><p>Best,<br>[YOUR COMPANY]</p>\" }}",
+        "options": {}
+      },
+      "id": "3bdb2728-448b-4359-a4e2-0cb619202cab",
+      "name": "Send Day 3 Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        992,
+        512
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "days"
+      },
+      "id": "7315bbcf-6aff-43a5-bb5c-107736b6d8c0",
+      "name": "Wait 4 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1216,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $(\"Determine Branch\").item.json.phone }}",
+        "message": "={{ \"Hi \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \", just checking in! Have you had a chance to think about your roofing needs? We're offering free inspections this month. Let us know if you'd like to schedule one. - [YOUR COMPANY]\" }}",
+        "options": {}
+      },
+      "id": "713976bb-7b6f-4e02-b164-6107eafb7563",
+      "name": "Send Day 7 SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 7,
+        "unit": "days"
+      },
+      "id": "69a13d73-a360-413a-bb1d-a70a37daa985",
+      "name": "Wait 7 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1664,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $(\"Determine Branch\").item.json.email }}",
+        "subject": "Does Insurance Cover Your Roof?",
+        "message": "={{ \"<h2>Insurance Claims for Roofing: What You Should Know</h2><p>Hi \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \",</p><p>Many homeowners don't realize their insurance may cover roof repairs or replacement. Here's what you need to know:</p><h3>What Insurance Typically Covers</h3><ul><li>Storm damage (wind, hail)</li><li>Fallen tree damage</li><li>Fire damage</li><li>Sudden, accidental damage</li></ul><h3>What's Usually NOT Covered</h3><ul><li>Normal wear and tear</li><li>Poor maintenance</li><li>Cosmetic damage</li></ul><h3>How We Can Help</h3><p>We work directly with insurance companies and can:</p><ul><li>Provide free damage assessments</li><li>Document damage for claims</li><li>Communicate with adjusters</li><li>Help maximize your claim</li></ul><p>If you've experienced storm damage or suspect roof issues, we can help you navigate the insurance process.</p><p>Schedule a free inspection: [YOUR PHONE]</p><p>Best regards,<br>[YOUR COMPANY]</p>\" }}",
+        "options": {}
+      },
+      "id": "eb50a3a7-c314-4025-9d34-1f8e80b696ba",
+      "name": "Send Day 14 Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1888,
+        512
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 7,
+        "unit": "days"
+      },
+      "id": "6781d15d-6ee4-4425-8ec5-1a4b4624edc6",
+      "name": "Wait 7 Days Final",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g., +15551234567)__>",
+        "to": "={{ $(\"Determine Branch\").item.json.phone }}",
+        "message": "={{ \"Hi \" + $(\"Determine Branch\").item.json.full_name.split(\" \")[0] + \", this is our final check-in. We're here whenever you need roofing services. Save our number for future reference: [YOUR PHONE]. Thanks for considering [YOUR COMPANY]!\" }}",
+        "options": {}
+      },
+      "id": "807b1bfb-3c51-4749-8704-34eaf52e440c",
+      "name": "Send Day 21 SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        2336,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__JobNimbus Tasks API URL (e.g., https://app.jobnimbus.com/api1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"title\": \"Post-Inspection Follow-Up - \" + $(\"Determine Branch\").item.json.full_name, \"description\": \"Follow up after inspection appointment. Discuss findings, provide estimate, and close the deal. Customer: \" + $(\"Determine Branch\").item.json.full_name + \" | Phone: \" + $(\"Determine Branch\").item.json.phone + \" | Address: \" + $(\"Determine Branch\").item.json.address, \"due_date\": $now.fromISO($(\"Create Calendar Appointment\").item.json.start.dateTime).plus(1, \"day\").toISO(), \"priority\": \"high\", \"related_to\": $(\"Create JobNimbus Hot Lead\").item.json.jnid, \"assigned_to\": \"sales_team\" } }}",
+        "options": {}
+      },
+      "id": "8ffdf04d-05c4-42fb-a350-4c2d8a0a1684",
+      "name": "Create Future Follow-Up Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1664,
+        128
+      ]
+    }
+  ],
+  "connections": {
+    "Inbound Lead Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Detect Emergency Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Emergency Keywords": {
+      "main": [
+        [
+          {
+            "node": "Determine Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Branch": {
+      "main": [
+        [
+          {
+            "node": "Route by Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Branch": {
+      "main": [
+        [
+          {
+            "node": "Create JobNimbus Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create JobNimbus Hot Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create JobNimbus Warm Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create JobNimbus Cold Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create JobNimbus Lead": {
+      "main": [
+        [
+          {
+            "node": "Send Team SMS Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Team SMS Alert": {
+      "main": [
+        [
+          {
+            "node": "Send Team Email Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Team Email Alert": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Send Customer Confirmation SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create JobNimbus Hot Lead": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Appointment": {
+      "main": [
+        [
+          {
+            "node": "Send Customer SMS Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Customer SMS Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Send Estimator SMS Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Estimator SMS Alert": {
+      "main": [
+        [
+          {
+            "node": "Send Estimator Email Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Estimator Email Alert": {
+      "main": [
+        [
+          {
+            "node": "Create JobNimbus Follow-Up Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create JobNimbus Follow-Up Task": {
+      "main": [
+        [
+          {
+            "node": "Create Future Follow-Up Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Hot Lead to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Mark Appointment Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Appointment Booked": {
+      "main": [
+        []
+      ]
+    },
+    "Create JobNimbus Warm Lead": {
+      "main": [
+        [
+          {
+            "node": "Create Warm Follow-Up Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Warm Follow-Up Task": {
+      "main": [
+        [
+          {
+            "node": "Send Team Warm Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Team Warm Notification": {
+      "main": [
+        [
+          {
+            "node": "Wait 2 Hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2 Hours": {
+      "main": [
+        [
+          {
+            "node": "Send Customer Warm SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Customer Warm SMS": {
+      "main": [
+        [
+          {
+            "node": "Log Warm Lead to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Warm Lead to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Mark No Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create JobNimbus Cold Lead": {
+      "main": [
+        [
+          {
+            "node": "Log Cold Lead to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Cold Lead to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Send Day 1 SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Day 1 SMS": {
+      "main": [
+        [
+          {
+            "node": "Send Day 1 Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Day 1 Email": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Days": {
+      "main": [
+        [
+          {
+            "node": "Send Day 3 Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Day 3 Email": {
+      "main": [
+        [
+          {
+            "node": "Wait 4 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 4 Days": {
+      "main": [
+        [
+          {
+            "node": "Send Day 7 SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Day 7 SMS": {
+      "main": [
+        [
+          {
+            "node": "Wait 7 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 7 Days": {
+      "main": [
+        [
+          {
+            "node": "Send Day 14 Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Day 14 Email": {
+      "main": [
+        [
+          {
+            "node": "Wait 7 Days Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 7 Days Final": {
+      "main": [
+        [
+          {
+            "node": "Send Day 21 SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Future Follow-Up Task": {
+      "main": [
+        [
+          {
+            "node": "Log Hot Lead to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
