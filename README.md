@@ -20,16 +20,16 @@ A connected set of workflows that runs a maintenance request from intake to clos
 
 | Workflow | Nodes | Main tools |
 |---|---|---|
-| [01 - AppFolio Work Order Received → Tenant Acknowledgment](property-management/maintenance-system/01---appfolio-work-order-received-to-tenant-acknowledgment.json) | 27 | Webhook, dataTable, Twilio, Gmail, HTTP/API |
-| [02 - Urgency Classification + Task Routing](property-management/maintenance-system/02---urgency-classification-task-routing.json) | 58 | dataTable, HTTP/API, Gmail |
-| [03 - SLA Monitor](property-management/maintenance-system/03---sla-monitor.json) | 10 | Schedule, dataTable |
-| [04 - Vendor Assignment](property-management/maintenance-system/04---vendor-assignment.json) | 21 | Gmail, Slack |
-| [05 - Tenant Status Updates](property-management/maintenance-system/05---tenant-status-updates.json) | 25 | Webhook, Twilio, Email |
-| [06 - Completion Confirmation](property-management/maintenance-system/06---completion-confirmation.json) | 22 | Twilio, Gmail, HTTP/API |
-| [07 - Audit Logger](property-management/maintenance-system/07---audit-logger.json) | 22 | HTTP/API, dataTable |
-| [08 - Error Handler](property-management/maintenance-system/08---error-handler.json) | 28 | Slack, Google Sheets |
-| [09 - Missed Call Follow-Up](property-management/maintenance-system/09---missed-call-follow-up.json) | 21 | Webhook, HTTP/API, Twilio, Gmail, dataTable |
-| [10 - Manual Urgency Override](property-management/maintenance-system/10---manual-urgency-override.json) | 18 | Webhook, HTTP/API, Slack, Gmail |
+| [01 - AppFolio Work Order Received → Tenant Acknowledgment](property-management/maintenance-system/01-appfolio-work-order-received-to-tenant-acknowledgment.json) | 27 | Webhook, dataTable, Twilio, Gmail, HTTP/API |
+| [02 - Urgency Classification + Task Routing](property-management/maintenance-system/02-urgency-classification-task-routing.json) | 58 | dataTable, HTTP/API, Gmail |
+| [03 - SLA Monitor](property-management/maintenance-system/03-sla-monitor.json) | 10 | Schedule, dataTable |
+| [04 - Vendor Assignment](property-management/maintenance-system/04-vendor-assignment.json) | 21 | Gmail, Slack |
+| [05 - Tenant Status Updates](property-management/maintenance-system/05-tenant-status-updates.json) | 25 | Webhook, Twilio, Email |
+| [06 - Completion Confirmation](property-management/maintenance-system/06-completion-confirmation.json) | 22 | Twilio, Gmail, HTTP/API |
+| [07 - Audit Logger](property-management/maintenance-system/07-audit-logger.json) | 22 | HTTP/API, dataTable |
+| [08 - Error Handler](property-management/maintenance-system/08-error-handler.json) | 28 | Slack, Google Sheets |
+| [09 - Missed Call Follow-Up](property-management/maintenance-system/09-missed-call-follow-up.json) | 21 | Webhook, HTTP/API, Twilio, Gmail, dataTable |
+| [10 - Manual Urgency Override](property-management/maintenance-system/10-manual-urgency-override.json) | 18 | Webhook, HTTP/API, Slack, Gmail |
 
 ## Property management
 
@@ -40,7 +40,7 @@ Maintenance triage, emergency escalation, AppFolio-based automation, rental lead
 | [AppFolio Maintenance Workflow](property-management/appfolio-maintenance-workflow.json) | 114 | Webhook, AI Agent, Gmail, HTTP/API, Twilio, Schedule |
 | [AppFolio Property Management Automation](property-management/appfolio-property-management-automation.json) | 28 | Webhook, Slack, HTTP/API, Twilio, Schedule |
 | [Emergency Maintenance Escalation](property-management/emergency-maintenance-escalation.json) | 10 | Webhook, Slack, Twilio, Email |
-| [Maintenance Request Auto-Triage (Claude) - Full with Fallbacks](property-management/maintenance-request-auto-triage-claude---full-with-fallbacks.json) | 17 | Google Sheets, Gmail, Slack, Webhook, HTTP/API |
+| [Maintenance Request Auto-Triage (Claude) - Full with Fallbacks](property-management/maintenance-request-auto-triage-claude-full-with-fallbacks.json) | 17 | Google Sheets, Gmail, Slack, Webhook, HTTP/API |
 | [Maintenance Request Auto-Triage](property-management/maintenance-request-auto-triage.json) | 31 | Google Sheets, Webhook, HTTP/API, Gmail, Slack, Schedule |
 | [Property Management AI Assistant](property-management/property-management-ai-assistant.json) | 82 | AI Agent, Webhook, Slack, Google Sheets, Twilio, Email |
 | [RentEngine Lead Automation](property-management/rentengine-lead-automation.json) | 27 | Webhook, dataTable, Twilio, Slack, Schedule |
@@ -73,7 +73,7 @@ Invoice detection, collection, data extraction, and document search.
 | [Automated Invoice Processing](finance-and-documents/automated-invoice-processing.json) | 17 | Google Drive, mindee, AI extraction, quickbooks, Claude |
 | [Email Invoice Retrieval and Response Generator for Printify Store](finance-and-documents/email-invoice-retrieval-and-response-generator-for-printify-store.json) | 8 | microsoftOutlookTrigger, HTTP/API, AI Agent, Claude |
 | [Multi-Source Invoice Collection and Centralization](finance-and-documents/multi-source-invoice-collection-and-centralization.json) | 5 | Gmail, Webhook, postgres, Schedule |
-| [P8 – Document Search](finance-and-documents/p8---document-search.json) | 6 | Gemini embeddings, Pinecone |
+| [P8 – Document Search](finance-and-documents/p8-document-search.json) | 6 | Gemini embeddings, Pinecone |
 
 ## Marketing
 
@@ -82,7 +82,7 @@ Ad performance monitoring and scheduled social media posting.
 | Workflow | Nodes | Main tools |
 |---|---|---|
 | [Facebook Auto Post](marketing/facebook-auto-post.json) | 22 | Schedule, Google Drive, HTTP/API, Slack, Gmail, Google Sheets |
-| [Google Drive - Meta ads](marketing/google-drive---meta-ads.json) | 14 | Schedule, Google Drive, HTTP/API, Slack, Gmail |
+| [Google Drive - Meta ads](marketing/google-drive-meta-ads.json) | 14 | Schedule, Google Drive, HTTP/API, Slack, Gmail |
 | [Meta Ad Monitoring](marketing/meta-ad-monitoring.json) | 22 | Schedule, HTTP/API, Gmail, Slack |
 | [Meta Performance Monitor](marketing/meta-performance-monitor.json) | 13 | Schedule, HTTP/API, Gmail, Slack |
 
