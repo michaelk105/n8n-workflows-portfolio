@@ -1,0 +1,690 @@
+{
+  "name": "Meta Ad Monitoring",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "6b075707-db7b-4192-91de-9a70199bc146",
+      "name": "Pre-Flight Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -816,
+        -528
+      ]
+    },
+    {
+      "parameters": {
+        "url": "<__PLACEHOLDER_VALUE__Campaign URL (e.g. https://graph.facebook.com/v18.0/123456789?fields=id,name,status,effective_status)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 3
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "cff3094a-8cee-4ab4-b452-cba18c46ecc2",
+      "name": "Check Campaign Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -592,
+        -528
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin Email Address__>",
+        "subject": "Client Brand Pre-Flight Check - Campaign API Failed",
+        "message": "The pre-flight check could not reach the Meta Marketing API to verify campaign status. The 8AM ad automation may not run correctly. Please verify your Meta API access token and campaign URL.",
+        "options": {}
+      },
+      "id": "5436e06c-ded9-4dd4-85c3-9dedbc76cfba",
+      "name": "Alert - Campaign Check Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -368,
+        -624
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "<__PLACEHOLDER_VALUE__Ad Set URL (e.g. https://graph.facebook.com/v18.0/987654321?fields=id,name,status,effective_status,daily_budget,lifetime_budget,budget_remaining)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 3
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "161967b2-4d3f-4b22-bc20-201c7049e707",
+      "name": "Check Ad Set Budget",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -368,
+        -432
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin Email Address__>",
+        "subject": "Client Brand Pre-Flight Check - Ad Set API Failed",
+        "message": "The pre-flight check could not verify the ad set budget from Meta Marketing API. Please verify your Meta API access token and ad set URL.",
+        "options": {}
+      },
+      "id": "04a052d6-56f6-42e6-92c6-47abffe33cd5",
+      "name": "Alert - Ad Set Check Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -144,
+        -528
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "<__PLACEHOLDER_VALUE__Ad Account URL (e.g. https://graph.facebook.com/v18.0/act_123456789?fields=id,account_status,disable_reason,currency,amount_spent,balance)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 3
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "3d4817dd-bbbd-4ac1-926f-41b5ee584f9a",
+      "name": "Check Payment Method",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -144,
+        -336
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin Email Address__>",
+        "subject": "Client Brand Pre-Flight Check - Account API Failed",
+        "message": "The pre-flight check could not verify the payment method from Meta Marketing API. Please verify your Meta API access token and ad account URL.",
+        "options": {}
+      },
+      "id": "8efe32f9-5abc-40d4-98e7-32aeb6827d44",
+      "name": "Alert - Account Check Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        80,
+        -432
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const campaign = $('Check Campaign Status').first().json;\nconst adset = $('Check Ad Set Budget').first().json;\nconst account = $('Check Payment Method').first().json;\n\nconst campaign_ok = campaign.status === 'ACTIVE' && campaign.effective_status === 'ACTIVE';\nconst budget_ok = (adset.budget_remaining && parseFloat(adset.budget_remaining) > 0) || \n                  (adset.daily_budget && parseFloat(adset.daily_budget) > 0);\nconst account_ok = account.account_status === 1;\nconst all_clear = campaign_ok && budget_ok && account_ok;\n\nlet status_summary = 'Pre-Flight Check Results:\\n\\n';\nstatus_summary += '✓ Campaign Status: ' + (campaign_ok ? 'PASSED - Campaign is ACTIVE' : 'FAILED - Campaign is ' + campaign.effective_status) + '\\n';\nstatus_summary += '✓ Budget Check: ' + (budget_ok ? 'PASSED - Budget available' : 'FAILED - No budget remaining') + '\\n';\nstatus_summary += '✓ Account Status: ' + (account_ok ? 'PASSED - Account active' : 'FAILED - Account status: ' + account.account_status) + '\\n';\n\nlet action_needed = '';\nif (!all_clear) {\n  action_needed = 'Action needed in Meta Ads Manager:\\n\\n';\n  if (!campaign_ok) {\n    action_needed += '• Campaign is ' + campaign.effective_status + ' - Go to Campaigns tab and set status to ACTIVE\\n';\n  }\n  if (!budget_ok) {\n    action_needed += '• No budget remaining - Go to Ad Sets tab and increase daily_budget or add lifetime_budget\\n';\n  }\n  if (!account_ok) {\n    action_needed += '• Account status is ' + account.account_status + ' (not active) - Check payment method in Billing settings';\n    if (account.disable_reason) {\n      action_needed += ' (Reason: ' + account.disable_reason + ')';\n    }\n    action_needed += '\\n';\n  }\n}\n\nreturn [{\n  json: {\n    campaign_ok,\n    budget_ok,\n    account_ok,\n    all_clear,\n    status_summary,\n    action_needed,\n    campaign_data: campaign,\n    adset_data: adset,\n    account_data: account\n  }\n}];"
+      },
+      "id": "313db263-52e4-47d6-8b20-78255248a9dc",
+      "name": "Evaluate Pre-Flight",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.all_clear }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2196689c-f8ce-4a58-95f6-8d5ed710ba05",
+      "name": "All Systems Go?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        304,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ad-automation"
+        },
+        "text": "Client Brand pre-flight check passed — campaign active, budget available, account in good standing. Ad automation will run at 8AM as scheduled.",
+        "otherOptions": {}
+      },
+      "id": "05d09513-4fed-4a12-8fb6-ba8185e53691",
+      "name": "Pre-Flight Passed",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        528,
+        -336
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin Email Address__>",
+        "subject": "Client Brand Pre-Flight Check - All Systems Go",
+        "message": "=<h2>Client Brand Pre-Flight Check - PASSED</h2><p>All systems are ready for the 8AM ad automation run.</p><pre>{{ $(\"Evaluate Pre-Flight\").item.json.status_summary }}</pre>",
+        "options": {}
+      },
+      "id": "9e0ea62e-b1a0-42b4-bedf-f568f24bfe73",
+      "name": "Pre-Flight Clear",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        -336
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ad-automation"
+        },
+        "text": "=🚨 Client Brand ad automation WILL NOT RUN at 8AM — action needed:\n\n{{ $(\"Evaluate Pre-Flight\").item.json.action_needed }}",
+        "otherOptions": {}
+      },
+      "id": "1e6dd983-aa34-4edc-8d91-b603f615f1db",
+      "name": "Pre-Flight Failed - Action Needed",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        528,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin Email Address__>",
+        "subject": "ACTION NEEDED - Client Brand Ad Automation Blocked",
+        "message": "=<h2>Client Brand Pre-Flight Check - FAILED</h2><p><strong>The 8AM ad automation will NOT run until these issues are resolved.</strong></p><h3>Status Summary:</h3><pre>{{ $(\"Evaluate Pre-Flight\").item.json.status_summary }}</pre><h3>Action Required:</h3><pre>{{ $(\"Evaluate Pre-Flight\").item.json.action_needed }}</pre><p>The pre-flight check will run again next Monday at 7AM. Please fix these issues in Meta Ads Manager before then.</p>",
+        "options": {}
+      },
+      "id": "cc5e2906-c4c4-40bc-a525-8ea6313010e5",
+      "name": "Pre-Flight Failed Report",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        -144
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                2
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "cc428f92-51e5-4d26-ad5f-c1312767d624",
+      "name": "24 Hour Post-Creation Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -816,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "url": "<__PLACEHOLDER_VALUE__Ad Account Ads URL (e.g. https://graph.facebook.com/v18.0/act_123456789/ads?fields=id,name,status,effective_status,configured_status,delivery_info)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 3
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "5ef67dec-cb8c-4df2-9c6c-635ffce55a4c",
+      "name": "Check Ad Delivery Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -592,
+        176
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin Email Address__>",
+        "subject": "Client Brand Post-Creation Check - Delivery API Failed",
+        "message": "The 24-hour post-creation check could not reach Meta Marketing API to verify ad delivery. Please manually verify ad delivery in Meta Ads Manager.",
+        "options": {}
+      },
+      "id": "759f5954-8b08-450c-b82c-81dcd74bef73",
+      "name": "Alert - Delivery Check Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -368,
+        80
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $('Check Ad Delivery Status').first().json;\nconst ads = response.data || [];\n\nconst problematic_ads = [];\n\nfor (const ad of ads) {\n  const is_ok = ad.effective_status === 'ACTIVE' || ad.effective_status === 'IN_REVIEW';\n  \n  if (!is_ok) {\n    problematic_ads.push({\n      id: ad.id,\n      name: ad.name,\n      effective_status: ad.effective_status,\n      delivery_info: ad.delivery_info || {},\n      reason: ad.effective_status\n    });\n  }\n}\n\nconst has_delivery_issues = problematic_ads.length > 0;\n\nlet issue_summary = '';\nif (has_delivery_issues) {\n  issue_summary = 'Delivery Issues Found:\\n\\n';\n  for (const ad of problematic_ads) {\n    issue_summary += 'Ad: ' + ad.name + ' (ID: ' + ad.id + ')\\n';\n    issue_summary += 'Status: ' + ad.effective_status + '\\n';\n    \n    let explanation = '';\n    switch (ad.effective_status) {\n      case 'PAUSED':\n        explanation = 'The ad is paused. Go to Ads Manager and set it to Active.';\n        break;\n      case 'DISAPPROVED':\n        explanation = 'The ad was disapproved by Meta. Review the ad content and policy violations in Ads Manager.';\n        break;\n      case 'PENDING_REVIEW':\n        explanation = 'The ad is still pending review. This is normal for new ads, check again in a few hours.';\n        break;\n      case 'CAMPAIGN_PAUSED':\n        explanation = 'The parent campaign is paused. Go to Campaigns tab and activate it.';\n        break;\n      case 'ADSET_PAUSED':\n        explanation = 'The parent ad set is paused. Go to Ad Sets tab and activate it.';\n        break;\n      default:\n        explanation = 'Check Meta Ads Manager for details on status: ' + ad.effective_status;\n    }\n    \n    issue_summary += 'Fix: ' + explanation + '\\n\\n';\n  }\n}\n\nreturn [{\n  json: {\n    has_delivery_issues,\n    problematic_ads,\n    issue_summary,\n    total_ads: ads.length,\n    ads_ok: ads.length - problematic_ads.length\n  }\n}];"
+      },
+      "id": "978fcd56-b718-4eb6-8b30-9db211f8a239",
+      "name": "Check Delivery Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_delivery_issues }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "id": "818e92b9-9470-4892-bcdb-2ed0a928e9d1"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "41d87365-a29d-400f-9509-197d1d7529eb",
+      "name": "Any Delivery Issues?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -144,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin Email Address__>",
+        "subject": "Client Brand Ad Not Delivering - Action Needed",
+        "message": "=<h2>Client Brand Ad Delivery Problem Detected</h2><p>One or more ads created yesterday are not delivering properly.</p><h3>Issue Summary:</h3><pre>{{ $(\"Check Delivery Result\").item.json.issue_summary }}</pre><p>Please review and fix these issues in Meta Ads Manager.</p>",
+        "options": {}
+      },
+      "id": "0ca4e09a-8df5-43aa-9d02-4b66f35f308e",
+      "name": "Ad Delivery Problem Detected",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        80,
+        112
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ad-automation"
+        },
+        "text": "=⚠️ Client Brand Ad Delivery Issues Detected:\n\n{{ $(\"Check Delivery Result\").item.json.issue_summary }}",
+        "otherOptions": {}
+      },
+      "id": "2f0bca31-5456-4c8c-a5d1-cccf0fc90987",
+      "name": "Delivery Issue Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        304,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ad-automation"
+        },
+        "text": "=✅ All Client Brand ads created yesterday are delivering as expected. {{ $(\"Check Delivery Result\").item.json.total_ads }} ads active.",
+        "otherOptions": {}
+      },
+      "id": "282e463e-f375-4c4a-bb1a-f5140524def4",
+      "name": "Ads Delivering Normally",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        80,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Admin Email Address__>",
+        "subject": "Client Brand Ads Delivering Normally",
+        "message": "=<h2>Client Brand 24-Hour Check - All Clear</h2><p>All ads created yesterday are delivering as expected.</p><p><strong>Total Ads:</strong> {{ $(\"Check Delivery Result\").item.json.total_ads }}</p><p><strong>Ads Delivering:</strong> {{ $(\"Check Delivery Result\").item.json.ads_ok }}</p><p>No action needed.</p>",
+        "options": {}
+      },
+      "id": "1fb1d1d9-44a8-400a-ac40-de1134384820",
+      "name": "Ads Delivering Confirmation",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        304,
+        368
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Pre-Flight Check": {
+      "main": [
+        [
+          {
+            "node": "Check Campaign Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Campaign Status": {
+      "main": [
+        [
+          {
+            "node": "Check Ad Set Budget",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert - Campaign Check Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Ad Set Budget": {
+      "main": [
+        [
+          {
+            "node": "Check Payment Method",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert - Ad Set Check Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Payment Method": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Pre-Flight",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert - Account Check Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Pre-Flight": {
+      "main": [
+        [
+          {
+            "node": "All Systems Go?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "All Systems Go?": {
+      "main": [
+        [
+          {
+            "node": "Pre-Flight Passed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pre-Flight Failed - Action Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-Flight Passed": {
+      "main": [
+        [
+          {
+            "node": "Pre-Flight Clear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-Flight Failed - Action Needed": {
+      "main": [
+        [
+          {
+            "node": "Pre-Flight Failed Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "24 Hour Post-Creation Check": {
+      "main": [
+        [
+          {
+            "node": "Check Ad Delivery Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Ad Delivery Status": {
+      "main": [
+        [
+          {
+            "node": "Check Delivery Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert - Delivery Check Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Delivery Result": {
+      "main": [
+        [
+          {
+            "node": "Any Delivery Issues?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Delivery Issues?": {
+      "main": [
+        [
+          {
+            "node": "Ad Delivery Problem Detected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ads Delivering Normally",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ad Delivery Problem Detected": {
+      "main": [
+        [
+          {
+            "node": "Delivery Issue Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ads Delivering Normally": {
+      "main": [
+        [
+          {
+            "node": "Ads Delivering Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

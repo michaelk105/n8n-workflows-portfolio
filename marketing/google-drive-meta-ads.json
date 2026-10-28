@@ -1,0 +1,471 @@
+{
+  "name": "Google Drive - Meta ads",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "7b4728a6-7d65-45af-bccf-4b7853f765a0",
+      "name": "Every Monday 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "mode": "list",
+            "value": ""
+          },
+          "whatToSearch": "files"
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "mimeType",
+            "webViewLink"
+          ]
+        }
+      },
+      "id": "3478abfd-384f-42b9-9778-05354706f1d7",
+      "name": "Get Ready Assets",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (items.length === 0) {\n  return [{ json: { has_asset: false } }];\n}\n\n// Use first item (most recently added based on Drive API default sort)\nconst mostRecent = items[0].json;\n\n// Determine file type\nlet fileType = 'unknown';\nif (mostRecent.mimeType.startsWith('image/')) {\n  fileType = 'image';\n} else if (mostRecent.mimeType.startsWith('video/')) {\n  fileType = 'video';\n}\n\nreturn [{\n  json: {\n    has_asset: true,\n    file_id: mostRecent.id,\n    file_name: mostRecent.name,\n    file_type: fileType,\n    drive_link: mostRecent.webViewLink,\n    mime_type: mostRecent.mimeType\n  }\n}];"
+      },
+      "id": "f23ad39b-f0c9-4e5d-bddb-ee21f960a0df",
+      "name": "Select Next Asset",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_asset }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c56cf7d3-2f4b-45bc-97e1-5a2c0f6e243f",
+      "name": "Asset Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        912,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "ad_account_id",
+              "value": "<__PLACEHOLDER_VALUE__Meta Ad Account ID (e.g., 123456789)__>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8bf42a64-c852-44f9-8df7-83d1f2406276",
+      "name": "Add Meta Account ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1136,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/act_{{ $json.ad_account_id }}/adimages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $(\"Select Next Asset\").item.json.drive_link }}"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "ebe6aa8b-d59a-4097-9128-367b225f0e2b",
+      "name": "Upload Creative to Meta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        400
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "campaign_id",
+              "value": "<__PLACEHOLDER_VALUE__Meta Campaign ID__>",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "adset_id",
+              "value": "<__PLACEHOLDER_VALUE__Meta Ad Set ID__>",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "creative_hash",
+              "value": "={{ $json.images.hash }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "96401591-4f3c-42ea-b271-dfdd10f27fbe",
+      "name": "Add Campaign Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1584,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/act_{{ $json.ad_account_id }}/ads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"name\": \"Client Brand - \" + $(\"Select Next Asset\").item.json.file_name, \"adset_id\": $json.adset_id, \"creative\": { \"creative_id\": $json.campaign_id }, \"status\": \"PAUSED\" } }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          }
+        }
+      },
+      "id": "2b606eb4-a015-4bbf-b94e-00dcf9947450",
+      "name": "Create Meta Ad Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1808,
+        304
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ad-automation"
+        },
+        "text": "=✅ Client Brand Meta Ad Draft Ready!\n\n*Asset:* {{ $(\"Select Next Asset\").item.json.file_name }}\n*File Type:* {{ $(\"Select Next Asset\").item.json.file_type }}\n*Ad ID:* {{ $json.id }}\n*Status:* PAUSED (requires approval)\n\n👉 Log into Meta Ads Manager to review and publish the draft ad.",
+        "otherOptions": {}
+      },
+      "id": "9519710e-6e3a-41a6-82b3-467c9750e195",
+      "name": "Notify - Draft Ready for Review",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        2032,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@example.com__>",
+        "subject": "Client Brand Meta Ad Draft Created - Review Required",
+        "message": "=<h2>Client Brand Meta Ad Draft Created Successfully</h2><p>A new Meta ad draft has been created and is ready for your review.</p><h3>Asset Details:</h3><ul><li><strong>File Name:</strong> {{ $(\"Select Next Asset\").item.json.file_name }}</li><li><strong>File Type:</strong> {{ $(\"Select Next Asset\").item.json.file_type }}</li><li><strong>Drive Link:</strong> <a href=\"{{ $(\"Select Next Asset\").item.json.drive_link }}\">View in Google Drive</a></li><li><strong>Ad ID:</strong> {{ $(\"Create Meta Ad Draft\").item.json.id }}</li></ul><h3>⚠️ Important:</h3><p><strong>The ad is currently PAUSED and NOT live.</strong></p><p>Please log into Meta Ads Manager to:</p><ol><li>Review the ad creative and settings</li><li>Make any necessary adjustments</li><li>Manually publish the ad when ready</li></ol><p><em>Nothing goes live automatically. Human approval is required.</em></p>",
+        "options": {}
+      },
+      "id": "eb10d0a4-94cb-4413-9b6f-8c1c4b5152fd",
+      "name": "Ad Draft Ready",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2256,
+        208
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@example.com__>",
+        "subject": "=Client Brand Meta Ad - Upload Failed for {{ $(\"Select Next Asset\").item.json.file_name }}",
+        "message": "=<h2>Meta Creative Upload Failed</h2><p><strong>Asset:</strong> {{ $(\"Select Next Asset\").item.json.file_name }}</p><p><strong>File Type:</strong> {{ $(\"Select Next Asset\").item.json.file_type }}</p><p><strong>Drive Link:</strong> <a href=\"{{ $(\"Select Next Asset\").item.json.drive_link }}\">{{ $(\"Select Next Asset\").item.json.drive_link }}</a></p><p><strong>Error:</strong> Request failed</p><p>Please check the Meta Marketing API credentials and try again.</p>",
+        "options": {}
+      },
+      "id": "60504949-038b-4e43-8a65-5d461499bbed",
+      "name": "Alert - Upload Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1584,
+        496
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@example.com__>",
+        "subject": "=Client Brand Meta Ad - Draft Creation Failed for {{ $(\"Select Next Asset\").item.json.file_name }}",
+        "message": "=<h2>Meta Ad Draft Creation Failed</h2><p><strong>Asset:</strong> {{ $(\"Select Next Asset\").item.json.file_name }}</p><p><strong>File Type:</strong> {{ $(\"Select Next Asset\").item.json.file_type }}</p><p><strong>Creative Hash:</strong> {{ $(\"Add Campaign Parameters\").item.json.creative_hash }}</p><p><strong>Error:</strong> Request failed</p><p>The creative was uploaded successfully, but the ad draft creation failed. Please check the Campaign ID and Ad Set ID.</p>",
+        "options": {}
+      },
+      "id": "06dbec7b-0940-4dcf-8949-757b0cbb43d7",
+      "name": "Alert - Ad Creation Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2032,
+        400
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ad-automation"
+        },
+        "text": "⚠️ Client Brand Meta Ad Automation: No assets found in the Client Brand/Ads folder. Please add new creative assets to continue.",
+        "otherOptions": {}
+      },
+      "id": "4bd446c6-0c2d-469e-a559-ef071835eeb5",
+      "name": "Notify - No Assets Found",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1136,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Client Brand Meta Ad Automation\n\n**Runs every Monday at 8:00 AM**\n\n1. Fetches all assets from Client Brand/Ads folder in Google Drive\n2. Selects the most recently added file\n3. Uploads creative to Meta Marketing API\n4. Creates a PAUSED draft ad in Meta Ads Manager\n5. Notifies team via Slack and email\n\n**⚠️ IMPORTANT:**\nNothing ever goes live automatically. All ads are created in PAUSED status and require human approval in Meta Ads Manager before publishing.\n\n**Error Handling:**\nEvery external API call has error handling. If upload or ad creation fails, admin receives email alerts with error details.",
+        "height": 180,
+        "width": 2700,
+        "color": 2
+      },
+      "id": "8f8193f8-c039-4734-aca3-da50bd0da94d",
+      "name": "Sticky Note dab7566b",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        -144
+      ]
+    }
+  ],
+  "connections": {
+    "Every Monday 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Get Ready Assets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Ready Assets": {
+      "main": [
+        [
+          {
+            "node": "Select Next Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Next Asset": {
+      "main": [
+        [
+          {
+            "node": "Asset Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Asset Available?": {
+      "main": [
+        [
+          {
+            "node": "Add Meta Account ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify - No Assets Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Meta Account ID": {
+      "main": [
+        [
+          {
+            "node": "Upload Creative to Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Creative to Meta": {
+      "main": [
+        [
+          {
+            "node": "Add Campaign Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert - Upload Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Campaign Parameters": {
+      "main": [
+        [
+          {
+            "node": "Create Meta Ad Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Meta Ad Draft": {
+      "main": [
+        [
+          {
+            "node": "Notify - Draft Ready for Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert - Ad Creation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify - Draft Ready for Review": {
+      "main": [
+        [
+          {
+            "node": "Ad Draft Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

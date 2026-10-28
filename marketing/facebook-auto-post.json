@@ -1,0 +1,877 @@
+{
+  "name": "Facebook Auto Post",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 10
+            }
+          ]
+        }
+      },
+      "id": "162e1e52-0541-4806-b17c-a9effc67b5e3",
+      "name": "Daily Facebook Post",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "={{ \"name contains '.jpg' or name contains '.jpeg' or name contains '.png'\" }}",
+        "returnAll": true,
+        "filter": {
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "",
+            "cachedResultName": "",
+            "cachedResultUrl": ""
+          },
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "",
+            "cachedResultName": "",
+            "cachedResultUrl": ""
+          },
+          "whatToSearch": "files"
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "mimeType"
+          ]
+        }
+      },
+      "id": "232f77cd-652b-4928-97d7-e7743a8f38a9",
+      "name": "Get Images from Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        464,
+        416
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.content_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "97ce6692-5ddc-41f0-8341-3cc59ae3d0b4",
+      "name": "Image Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1136,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ \"https://www.googleapis.com/drive/v3/files/\" + $json.file_id + \"?alt=media\" }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "f5c0abcf-a3e8-42c6-b182-54d472531b12",
+      "name": "Download Image from Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        320
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \"https://graph.facebook.com/v18.0/\" + \"<__PLACEHOLDER_VALUE__your-page-id__>\" + \"/photos?access_token=\" + \"<__PLACEHOLDER_VALUE__your-facebook-page-access-token__>\" }}",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "source",
+              "value": "={{ $binary.data }}"
+            },
+            {
+              "name": "caption",
+              "value": "Check out our latest Client Brand skateboard — designed for maximum performance. Link in bio. #Client Brand #Skateboarding #Skate #SkateLife #SkateboardingIsLife"
+            },
+            {
+              "name": "published",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "0247c648-5694-4281-a589-e56cb16470cc",
+      "name": "Post Image to Facebook Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1584,
+        416
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ad-automation"
+        },
+        "text": "={{ \"✅ Client Brand Facebook Post Successful\\n\\n\" +\n\"*Image Posted:* \" + $(\"Get Today's Scheduled Post\").item.json.file_name + \"\\n\" +\n\"*Posted At:* \" + $now.toFormat(\"MMMM d, yyyy h:mm a\") }}",
+        "otherOptions": {}
+      },
+      "id": "eb5cd524-6786-47d0-b3e8-6b3909774e71",
+      "name": "Post Successful",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        2032,
+        512
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@example.com__>",
+        "subject": "={{ \"Client Brand - Daily Post Confirmation - \" + $now.toFormat(\"MMMM d, yyyy\") }}",
+        "message": "={{ \"<h2>Client Brand Daily Facebook Post Confirmation</h2>\" +\n\"<p><strong>Image Posted:</strong> \" + $(\"Get Today's Scheduled Post\").item.json.file_name + \"</p>\" +\n\"<p><strong>Posted At:</strong> \" + $now.toFormat(\"MMMM d, yyyy h:mm a\") + \"</p>\" +\n\"<hr>\" +\n\"<p><em>Reminder: Schedule upcoming posts via the dashboard to ensure continuous daily posting.</em></p>\" }}",
+        "options": {}
+      },
+      "id": "f1de748b-673f-4fde-87b9-25281219221e",
+      "name": "Daily Post Confirmation",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2256,
+        512
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@example.com__>",
+        "subject": "Client Brand - Image Download Failed",
+        "message": "={{ \"<h2>Image Download Failed</h2>\" +\n\"<p><strong>File Name:</strong> \" + $(\"Get Today's Scheduled Post\").item.json.file_name + \"</p>\" +\n\"<p><strong>File ID:</strong> \" + $(\"Get Today's Scheduled Post\").item.json.file_id + \"</p>\" +\n\"<p><strong>Error:</strong> \" + ($json.error?.message ?? $json.message ?? \"Unknown error\") + \"</p>\" +\n\"<p>Please check the Google Drive permissions and try again.</p>\" }}",
+        "options": {}
+      },
+      "id": "1eceb527-a60b-401c-9987-5353894a9bd9",
+      "name": "Alert - Download Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1584,
+        224
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@example.com__>",
+        "subject": "Client Brand - Facebook Post Failed",
+        "message": "={{ \"<h2>Facebook Post Failed</h2>\" +\n\"<p><strong>Image Name:</strong> \" + $(\"Get Today's Scheduled Post\").item.json.file_name + \"</p>\" +\n\"<p><strong>Error:</strong> \" + ($json.error?.message ?? $json.message ?? \"Unknown error\") + \"</p>\" +\n\"<p><strong>Note:</strong> Please check that the Facebook Page Access Token has not expired. You may need to regenerate it in the Facebook Developer Console.</p>\" }}",
+        "options": {}
+      },
+      "id": "2e91ed09-b329-49b8-88aa-64dc155370aa",
+      "name": "Alert - Facebook Post Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1808,
+        320
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ad-automation"
+        },
+        "text": "={{ \"⚠️ Client Brand Facebook Auto Post Alert\\n\\nNo post scheduled for today (\" + $now.toFormat(\"MMMM d, yyyy\") + \"). Please schedule posts via the dashboard to continue automated posting.\" }}",
+        "otherOptions": {}
+      },
+      "id": "bcf172f6-1a49-47bb-a2d1-0f03aa2fe01c",
+      "name": "No Images Found",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1360,
+        512
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "content": "## Client Brand - Daily Facebook Auto Post\n\nSean manually schedules each image via the dashboard by dragging it onto a specific day. This workflow checks daily for what is scheduled TODAY only and posts it. Nothing posts automatically if a day has no schedule assigned.",
+        "height": 120,
+        "width": 800,
+        "color": 2
+      },
+      "id": "8c4128a3-d246-4d74-8686-e9c2adaf0b8c",
+      "name": "Sticky Note ef2e049b",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        272,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1kI_WWegLDg4cUkPHzyFnSShHhbRYQDckKVuuVStAxcA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Client Brand Content Library"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "content_id": "={{ $json.id }}",
+            "file_name": "={{ $json.name }}",
+            "file_id": "={{ $json.id }}",
+            "date_added": "={{ $now.toISO() }}",
+            "status": "unscheduled",
+            "scheduled_date": "",
+            "posted_at": ""
+          },
+          "schema": [
+            {
+              "id": "content_id",
+              "displayName": "content_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_name",
+              "displayName": "file_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date_added",
+              "displayName": "date_added",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "scheduled_date",
+              "displayName": "scheduled_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "posted_at",
+              "displayName": "posted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3a555475-f5ca-49b0-93b2-f5de1f9fce51",
+      "name": "Log Asset to Client Brand Library",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        688,
+        416
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1kI_WWegLDg4cUkPHzyFnSShHhbRYQDckKVuuVStAxcA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Client Brand Content Library",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "a5bef75b-9828-4081-aabe-f38abc5a0618",
+      "name": "Get Today's Scheduled Post",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        912,
+        416
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1kI_WWegLDg4cUkPHzyFnSShHhbRYQDckKVuuVStAxcA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Client Brand Content Library"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "content_id": "={{ $(\"Get Today's Scheduled Post\").item.json.content_id }}",
+            "status": "posted",
+            "posted_at": "={{ $now.toISO() }}",
+            "scheduled_date": ""
+          },
+          "matchingColumns": [
+            "content_id"
+          ],
+          "schema": [
+            {
+              "id": "content_id",
+              "displayName": "content_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "posted_at",
+              "displayName": "posted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "scheduled_date",
+              "displayName": "scheduled_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1f74c292-1d1a-407b-80bc-35aa062c126c",
+      "name": "Mark Image as Posted",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1808,
+        512
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "Client Brand-schedule",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "970fb188-53a8-4bfe-8a25-91cb7e67fbbc",
+      "name": "Receive Schedule from Dashboard",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1kI_WWegLDg4cUkPHzyFnSShHhbRYQDckKVuuVStAxcA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Client Brand Content Library"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "content_id": "={{ $json.body.content_id }}",
+            "scheduled_date": "={{ $json.body.scheduled_date }}",
+            "status": "scheduled"
+          },
+          "matchingColumns": [
+            "content_id"
+          ],
+          "schema": [
+            {
+              "id": "content_id",
+              "displayName": "content_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "scheduled_date",
+              "displayName": "scheduled_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ee8f9e62-2ec7-4e52-951c-9c83240662a0",
+      "name": "Write Schedule to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        464,
+        736
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Schedule updated successfully\", \"items_updated\": $input.all().length } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "1a48f74b-589d-4524-bdeb-859366c47977",
+      "name": "Respond to Dashboard",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        688,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "path": "Client Brand-library",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d65bc0f5-aab6-4338-acdd-e4a5f88354cb",
+      "name": "Get Library Data",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1kI_WWegLDg4cUkPHzyFnSShHhbRYQDckKVuuVStAxcA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Client Brand Content Library"
+        },
+        "options": {}
+      },
+      "id": "4741ce4a-b2d9-4b1f-8bde-3941859f95b7",
+      "name": "Read Full Library",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        464,
+        960
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst formattedItems = items.map(item => ({\n  content_id: item.json.content_id || \"\",\n  file_name: item.json.file_name || \"\",\n  file_id: item.json.file_id || \"\",\n  status: item.json.status || \"\",\n  scheduled_date: item.json.scheduled_date || \"\",\n  posted_at: item.json.posted_at || \"\"\n}));\n\nreturn formattedItems;"
+      },
+      "id": "efc9d3f1-3a5f-4583-a4ea-a2756c1674a2",
+      "name": "Format Library Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $input.all() }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "69073df6-68e1-4df0-95f0-7441c4481eaa",
+      "name": "Send Library Data",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        912,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Get Library Data\n\nDashboard calls this on page load to fetch the current real content library and schedule status from Google Sheets, instead of using hardcoded sample data.",
+        "height": 100,
+        "width": 700,
+        "color": 3
+      },
+      "id": "c3fc3cd8-ad2f-4c34-bbbf-92c383356f44",
+      "name": "Sticky Note Library",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        976
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Facebook Post": {
+      "main": [
+        [
+          {
+            "node": "Get Images from Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Images from Drive": {
+      "main": [
+        [
+          {
+            "node": "Log Asset to Client Brand Library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Available?": {
+      "main": [
+        [
+          {
+            "node": "Download Image from Drive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Images Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image from Drive": {
+      "main": [
+        [
+          {
+            "node": "Post Image to Facebook Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert - Download Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Image to Facebook Page": {
+      "main": [
+        [
+          {
+            "node": "Mark Image as Posted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert - Facebook Post Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Successful": {
+      "main": [
+        [
+          {
+            "node": "Daily Post Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Asset to Client Brand Library": {
+      "main": [
+        [
+          {
+            "node": "Get Today's Scheduled Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Today's Scheduled Post": {
+      "main": [
+        [
+          {
+            "node": "Image Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Image as Posted": {
+      "main": [
+        [
+          {
+            "node": "Post Successful",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Schedule from Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Write Schedule to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Schedule to Sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Library Data": {
+      "main": [
+        [
+          {
+            "node": "Read Full Library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Full Library": {
+      "main": [
+        [
+          {
+            "node": "Format Library Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Library Response": {
+      "main": [
+        [
+          {
+            "node": "Send Library Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

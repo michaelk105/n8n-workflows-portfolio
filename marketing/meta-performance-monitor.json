@@ -1,0 +1,426 @@
+{
+  "name": "Meta Performance Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Client Brand - Meta Performance Monitor\n\nStandalone workflow that runs every Monday at 8 AM.\n\n**What it does:**\n- Pulls last 7 days of Meta performance data\n- Automatically pauses underperforming ads\n- Emails a plain English weekly report\n- Replaces manual Meta Ads Manager check-ins\n\n**Pair with:** Client Brand - Meta Ad Automation workflow",
+        "height": 320,
+        "width": 400,
+        "color": 4
+      },
+      "id": "a5ffb55f-94f4-4277-b97b-d94c81fd7876",
+      "name": "Sticky Note 1e19f3e4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "627d9e3b-af5b-4209-ab7b-cc85318c0da5",
+      "name": "Every Monday 8AM Performance Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -400,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "ad_account_id",
+              "value": "<__PLACEHOLDER_VALUE__Meta Ad Account ID (e.g., 123456789)__>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1a1f9ad-955b-4c32-9693-d89f7c3eb590",
+      "name": "Add Meta Account ID for Insights",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -176,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v18.0/act_{{ $json.ad_account_id }}/insights",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "spend,impressions,clicks,ctr,cpm,reach,actions"
+            },
+            {
+              "name": "date_preset",
+              "value": "last_7d"
+            },
+            {
+              "name": "level",
+              "value": "ad"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "0a565044-c47d-4179-a48f-bd340da6b424",
+      "name": "Fetch Meta Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        48,
+        448
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@example.com__>",
+        "subject": "Client Brand Weekly Performance Pull Failed",
+        "message": "<h2>Meta Insights Fetch Failed</h2><p>The weekly performance data pull from Meta Marketing API failed.</p><p>Please log into Meta Ads Manager manually to check ad performance for the last 7 days.</p><p><strong>Error:</strong> Request failed</p>",
+        "options": {}
+      },
+      "id": "9cab4101-3783-4a96-92c3-3de5a35a5882",
+      "name": "Alert - Insights Fetch Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        544
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const insights = $input.first().json.data || [];\n\nif (insights.length === 0) {\n  return [{\n    json: {\n      has_underperformers: false,\n      underperforming_ad_ids: [],\n      summary: \"No ad data found for the last 7 days.\",\n      total_spend: 0,\n      total_impressions: 0,\n      total_clicks: 0,\n      total_reach: 0,\n      overall_ctr: 0,\n      ad_details: [],\n      paused_ads: []\n    }\n  }];\n}\n\nlet totalSpend = 0;\nlet totalImpressions = 0;\nlet totalClicks = 0;\nlet totalReach = 0;\nconst underperformingAdIds = [];\nconst adDetails = [];\n\ninsights.forEach(ad => {\n  const spend = parseFloat(ad.spend || 0);\n  const impressions = parseInt(ad.impressions || 0);\n  const clicks = parseInt(ad.clicks || 0);\n  const reach = parseInt(ad.reach || 0);\n  const cpm = parseFloat(ad.cpm || 0);\n  \n  // Calculate CTR\n  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;\n  \n  // Determine status\n  let status = \"normal\";\n  let reason = \"\";\n  \n  if (ctr < 1 && impressions > 100) {\n    status = \"underperforming\";\n    reason = \"CTR below 1%\";\n    underperformingAdIds.push(ad.ad_id);\n  } else if (spend > 50 && clicks < 10) {\n    status = \"underperforming\";\n    reason = \"wasted spend (>$50 with <10 clicks)\";\n    underperformingAdIds.push(ad.ad_id);\n  } else if (ctr > 3) {\n    status = \"top performer\";\n    reason = \"CTR above 3%\";\n  }\n  \n  totalSpend += spend;\n  totalImpressions += impressions;\n  totalClicks += clicks;\n  totalReach += reach;\n  \n  adDetails.push({\n    ad_id: ad.ad_id,\n    ad_name: ad.ad_name || \"Unknown\",\n    spend: spend.toFixed(2),\n    impressions,\n    clicks,\n    ctr: ctr.toFixed(2),\n    cpm: cpm.toFixed(2),\n    reach,\n    status,\n    reason\n  });\n});\n\nconst overallCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;\n\n// Build summary\nlet summary = `Weekly Performance Summary (Last 7 Days)\\n\\n`;\nsummary += `Total Spend: $${totalSpend.toFixed(2)}\\n`;\nsummary += `Total Impressions: ${totalImpressions.toLocaleString()}\\n`;\nsummary += `Total Clicks: ${totalClicks.toLocaleString()}\\n`;\nsummary += `Total Reach: ${totalReach.toLocaleString()}\\n`;\nsummary += `Overall CTR: ${overallCtr.toFixed(2)}%\\n\\n`;\nsummary += `Ad Performance:\\n`;\n\nadDetails.forEach(ad => {\n  summary += `\\n- ${ad.ad_name}\\n`;\n  summary += `  Spend: $${ad.spend} | Impressions: ${ad.impressions.toLocaleString()} | Clicks: ${ad.clicks} | CTR: ${ad.ctr}% | CPM: $${ad.cpm} | Reach: ${ad.reach.toLocaleString()}\\n`;\n  summary += `  Status: ${ad.status.toUpperCase()}`;\n  if (ad.reason) summary += ` (${ad.reason})`;\n  summary += `\\n`;\n});\n\nreturn [{\n  json: {\n    has_underperformers: underperformingAdIds.length > 0,\n    underperforming_ad_ids: underperformingAdIds,\n    summary,\n    total_spend: totalSpend.toFixed(2),\n    total_impressions: totalImpressions,\n    total_clicks: totalClicks,\n    total_reach: totalReach,\n    overall_ctr: overallCtr.toFixed(2),\n    ad_details: adDetails,\n    paused_ads: []\n  }\n}];"
+      },
+      "id": "25169d30-e084-4b76-9223-7bc60d8fa88f",
+      "name": "Analyze Performance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_underperformers }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "09d9e55b-7a29-407e-993a-f9687d7c0c5b",
+      "name": "Any Underperformers?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        496,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $json.underperforming_ad_ids[0] }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{ \"status\": \"PAUSED\" }",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          }
+        }
+      },
+      "id": "2ec7a344-fb31-431c-8c20-6e0d13838239",
+      "name": "Pause Underperforming Ads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        720,
+        432
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "paused_ads",
+              "value": "={{ $(\"Analyze Performance\").item.json.underperforming_ad_ids }}",
+              "type": "array"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "2a28f486-d6b4-4e4b-bd55-9ad450a5e36d",
+      "name": "Update Paused List",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        944,
+        336
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "6094cbfe-182a-41e3-9909-9f70f3774e28",
+      "name": "Merge Performance Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1168,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@example.com__>",
+        "subject": "Client Brand - Failed to Pause Underperforming Ads",
+        "message": "=<h2>Failed to Pause Underperforming Ads</h2><p>The following ads could not be automatically paused and need manual attention in Meta Ads Manager:</p><ul><li>Ad IDs: {{ $(\"Analyze Performance\").item.json.underperforming_ad_ids.join(\", \") }}</li></ul><p>Please log into Meta Ads Manager to manually pause these underperforming ads.</p>",
+        "options": {}
+      },
+      "id": "94927b17-b068-4746-b947-0a395c7b42eb",
+      "name": "Alert - Pause Failed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        944,
+        528
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__admin@example.com__>",
+        "subject": "=Client Brand Weekly Ad Report - {{ $now.toFormat(\"MMMM d, yyyy\") }}",
+        "message": "=<h2>Client Brand Weekly Ad Performance Report</h2><p><strong>Reporting Period:</strong> Last 7 Days</p><h3>Overall Performance:</h3><ul><li><strong>Total Spend:</strong> ${{ $(\"Analyze Performance\").item.json.total_spend }}</li><li><strong>Total Impressions:</strong> {{ $(\"Analyze Performance\").item.json.total_impressions.toLocaleString() }}</li><li><strong>Total Clicks:</strong> {{ $(\"Analyze Performance\").item.json.total_clicks.toLocaleString() }}</li><li><strong>Total Reach:</strong> {{ $(\"Analyze Performance\").item.json.total_reach.toLocaleString() }}</li><li><strong>Overall CTR:</strong> {{ $(\"Analyze Performance\").item.json.overall_ctr }}%</li></ul><h3>Individual Ad Performance:</h3>{{ $(\"Analyze Performance\").item.json.ad_details.map(ad => `<div style=\"margin: 15px 0; padding: 10px; border-left: 3px solid ${ad.status === \"top performer\" ? \"#28a745\" : ad.status === \"underperforming\" ? \"#dc3545\" : \"#6c757d\"}\"><strong>${ad.ad_name}</strong><br>Spend: $${ad.spend} | Impressions: ${ad.impressions.toLocaleString()} | Clicks: ${ad.clicks} | CTR: ${ad.ctr}% | CPM: $${ad.cpm} | Reach: ${ad.reach.toLocaleString()}<br><em>Status: ${ad.status.toUpperCase()}${ad.reason ? \" - \" + ad.reason : \"\"}</em></div>`).join(\"\") }}<h3>Automated Actions:</h3>{{ $(\"Analyze Performance\").item.json.paused_ads.length > 0 ? `<p>✅ The following ads were automatically paused due to underperformance:</p><ul>${$(\"Analyze Performance\").item.json.paused_ads.map(id => \"<li>Ad ID: \" + id + \"</li>\").join(\"\")}</ul>` : \"<p>No ads were paused this week.</p>\" }}<h3>⚠️ Reminder:</h3><p>Draft ads created this week are in PAUSED status and require manual review and approval in Meta Ads Manager before going live.</p><p><em>This is an automated report. Please review Meta Ads Manager for full details.</em></p>",
+        "options": {}
+      },
+      "id": "abd827f4-991b-49af-aa38-62d0e3dc84e9",
+      "name": "Weekly Performance Report",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1392,
+        256
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ad-automation"
+        },
+        "text": "=📊 Client Brand Weekly Performance Report Sent\n\n*Reporting Period:* Last 7 Days\n*Total Spend:* ${{ $(\"Analyze Performance\").item.json.total_spend }}\n*Overall CTR:* {{ $(\"Analyze Performance\").item.json.overall_ctr }}%\n*Ads Automatically Paused:* {{ $(\"Analyze Performance\").item.json.paused_ads.length }}\n\nFull report sent via email. Check Meta Ads Manager for details.",
+        "otherOptions": {}
+      },
+      "id": "7834b5f4-4f06-4d15-960e-f141bce34fa6",
+      "name": "Weekly Report Sent",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1616,
+        256
+      ]
+    }
+  ],
+  "connections": {
+    "Every Monday 8AM Performance Check": {
+      "main": [
+        [
+          {
+            "node": "Add Meta Account ID for Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Meta Account ID for Insights": {
+      "main": [
+        [
+          {
+            "node": "Fetch Meta Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Meta Insights": {
+      "main": [
+        [
+          {
+            "node": "Analyze Performance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert - Insights Fetch Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Performance": {
+      "main": [
+        [
+          {
+            "node": "Any Underperformers?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Underperformers?": {
+      "main": [
+        [
+          {
+            "node": "Pause Underperforming Ads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Performance Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Pause Underperforming Ads": {
+      "main": [
+        [
+          {
+            "node": "Update Paused List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert - Pause Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Paused List": {
+      "main": [
+        [
+          {
+            "node": "Merge Performance Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Performance Paths": {
+      "main": [
+        [
+          {
+            "node": "Weekly Performance Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Performance Report": {
+      "main": [
+        [
+          {
+            "node": "Weekly Report Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}
