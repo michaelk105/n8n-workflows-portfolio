@@ -1,0 +1,1616 @@
+{
+  "name": "08 - Error Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "work_order_id"
+            },
+            {
+              "name": "workflow_name"
+            },
+            {
+              "name": "error_type"
+            },
+            {
+              "name": "error_message"
+            },
+            {
+              "name": "failed_node_name"
+            },
+            {
+              "name": "tenant_name"
+            },
+            {
+              "name": "tenant_phone"
+            },
+            {
+              "name": "tenant_email"
+            },
+            {
+              "name": "urgency"
+            },
+            {
+              "name": "task_id"
+            },
+            {
+              "name": "appfolio_record_url"
+            },
+            {
+              "name": "original_payload",
+              "type": "object"
+            },
+            {
+              "name": "timestamp"
+            }
+          ]
+        }
+      },
+      "id": "0e4c28f3-976a-4cb3-9eed-7d3131d20bb5",
+      "name": "Receive Error Event",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "missing_phone"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "missing_email"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "missing_phone_and_email"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "sms_failed"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "email_failed"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "appfolio_task_creation_failed"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "appfolio_note_creation_failed"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "dashboard_update_failed"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "ai_classification_failed"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "vendor_notification_failed"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "vendor_assignment_failed"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "vendor_acceptance_timeout"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.error_type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "sla_escalation_failed"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "unknown_error"
+        }
+      },
+      "id": "4957ef0b-31e8-473f-96e7-d20abf2a5830",
+      "name": "Classify Error Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1808,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "Low",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Try email if available",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Send email notification",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "f80a57aa-d31c-4d9d-b04e-5172e04ad044",
+      "name": "Handle Missing Phone",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.severity }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "High"
+            },
+            {
+              "leftValue": "={{ $json.severity }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "Critical"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c870ae3f-9631-4c05-8382-01b2e0a4498e",
+      "name": "Check Severity Level",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2256,
+        1696
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "Low",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Try SMS if available",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Send SMS notification",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "265b3af9-f13c-418d-b912-dc79b7aed219",
+      "name": "Handle Missing Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "Medium",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Notify maintenance coordinator",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Create internal task for missing contact info",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "129d3663-749d-4b48-8810-5dc6894183a7",
+      "name": "Handle Missing Both",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "Medium",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Retry SMS once, then try email",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Retry SMS or fallback to email",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "retry_count",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "714ec01f-221b-4ef6-bff0-49254f66645f",
+      "name": "Handle SMS Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "Medium",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Retry email once, then try SMS",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Retry email or fallback to SMS",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "retry_count",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "806a05e1-d5ae-4af7-952b-eb6ae479a84a",
+      "name": "Handle Email Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "High",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Retry once, notify coordinator and property manager",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Retry AppFolio task creation",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "retry_count",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "8381f7ea-88f6-4567-996f-2d625b725660",
+      "name": "Handle AppFolio Task Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "Low",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Retry once, log warning, do not stop process",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Continue workflow, log warning",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "retry_count",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "43cc1306-b953-4243-9db9-452e8f1b32d1",
+      "name": "Handle AppFolio Note Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        1536
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "High",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Retry once, notify system administrator",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Retry dashboard update",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "retry_count",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "28747484-2d06-49eb-9a72-f42344b2ec17",
+      "name": "Handle Dashboard Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        1728
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "Medium",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Default urgency to Urgent, notify coordinator for manual review",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Set default urgency and notify coordinator",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "default_urgency",
+              "value": "Urgent",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "48f6c38c-2ac6-4df1-bb8f-1af715af5f75",
+      "name": "Handle AI Classification Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "Medium",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Retry vendor notification once",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Retry vendor notification",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "retry_count",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "1dbd10c2-e3d4-479f-9aba-d3c8825e4c01",
+      "name": "Handle Vendor Notification Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        2112
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "High",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Notify coordinator for manual vendor assignment",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Notify coordinator",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "29790df0-eb89-460c-a434-ee168f092a5d",
+      "name": "Handle Vendor Assignment Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        2304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "High",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Notify coordinator, escalate if Emergency/Urgent",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Check urgency and escalate",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "c672feaa-3c99-4c5e-bdd5-66ec86dd1538",
+      "name": "Handle Vendor Timeout",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        2496
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "High",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Retry escalation once, notify property manager and system admin",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Retry SLA escalation",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "retry_count",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "224b78c1-7b3f-4244-84d4-58f8963acab9",
+      "name": "Handle SLA Escalation Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        2688
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "severity",
+              "value": "Critical",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "recovery_action",
+              "value": "Notify system administrator with full error details",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "next_step",
+              "value": "Send critical alert to system admin",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "2fb5607f-e83c-43ce-ab6b-ce5311f997e6",
+      "name": "Handle Unknown Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        2880
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=🚨 *Automation Error Alert*\n\n*Workflow:* {{ $json.workflow_name }}\n*Work Order:* {{ $json.work_order_id }}\n*Error Type:* {{ $json.error_type }}\n*Error Message:* {{ $json.error_message }}\n*Failed Node:* {{ $json.failed_node_name }}\n*Severity:* {{ $json.severity }}{{ $json.severity_escalated ? \" (escalated from \" + $json.original_severity + \")\" : \"\" }}\n*Occurrences:* {{ $json.occurrence_count }}\n*Recovery Action:* {{ $json.recovery_action }}\n*Timestamp:* {{ $json.timestamp }}",
+        "otherOptions": {}
+      },
+      "id": "041d5a67-0008-417b-8038-087c579bfc17",
+      "name": "Send Internal Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        2480,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "5a35246d-7092-4f47-806f-4cba8043acf2",
+      "name": "Send to Audit Logger",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2928,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "alert_sent",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "df5f84d5-34e9-4808-87a0-093bc4465d3f",
+      "name": "Skip Alert (Low/Medium)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2480,
+        1792
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "error_key",
+              "value": "={{ $json.work_order_id }}_{{ $json.workflow_name }}_{{ $json.error_type }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "current_timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "36d6b67c-76f6-4e72-be74-4c2777ed91c6",
+      "name": "Create Error Key",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        464,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "f4707041-9dec-4053-b137-6e09a28f20cb",
+      "name": "Check Error Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        688,
+        960
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.last_occurrence_timestamp }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              },
+              "rightValue": "={{ $now.minus({ hours: 1 }).toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cb4b72fb-8fe6-458b-bcd4-f42e2aab69a0",
+      "name": "Check If Duplicate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        912,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "duplicate_suppressed",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "2",
+              "name": "action_taken",
+              "value": "Duplicate error suppressed",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "result",
+              "value": "={{ $json.error_type }} already handled within last 60 minutes",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "next_step",
+              "value": "Log to Audit Logger only",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "706f3e08-b730-4f18-a178-1f647d92d4e8",
+      "name": "Suppress Duplicate",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2704,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const errorLog = $input.first();\nconst errorEvent = $input.item.json;\n\nlet occurrence_count = 1;\nlet first_occurrence_timestamp = errorEvent.current_timestamp;\nlet last_occurrence_timestamp = errorEvent.current_timestamp;\n\nif (errorLog && errorLog.error_key) {\n  occurrence_count = (errorLog.occurrence_count || 0) + 1;\n  first_occurrence_timestamp = errorLog.first_occurrence_timestamp || errorEvent.current_timestamp;\n  last_occurrence_timestamp = errorEvent.current_timestamp;\n}\n\nreturn {\n  ...errorEvent,\n  occurrence_count,\n  first_occurrence_timestamp,\n  last_occurrence_timestamp\n};"
+      },
+      "id": "6c800134-290a-4b5f-8aff-1c789ddfb5cf",
+      "name": "Update Failure Counter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst firstOccurrence = new Date(item.first_occurrence_timestamp);\nconst now = new Date(item.current_timestamp);\nconst hoursDiff = (now - firstOccurrence) / (1000 * 60 * 60);\n\nlet escalated = false;\nif (item.occurrence_count >= 3 && hoursDiff <= 24) {\n  escalated = true;\n}\n\nreturn {\n  ...item,\n  escalation_triggered: escalated\n};"
+      },
+      "id": "a1924c00-78e8-4efa-b3d7-eac452536ca1",
+      "name": "Check Escalation Threshold",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\nif (!item.escalation_triggered) {\n  return item;\n}\n\nconst severityMap = {\n  Low: \"Medium\",\n  Medium: \"High\",\n  High: \"Critical\"\n};\n\nconst newSeverity = severityMap[item.severity] || item.severity;\n\nreturn {\n  ...item,\n  severity: newSeverity,\n  severity_escalated: true,\n  original_severity: item.severity\n};"
+      },
+      "id": "0dd08159-45c9-40a8-aa57-1def2ee1c21c",
+      "name": "Escalate Severity",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "2114619f-43a1-466f-9658-66dc86cbe751",
+      "name": "Update Error Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2704,
+        1696
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Error Event": {
+      "main": [
+        [
+          {
+            "node": "Create Error Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Error Type": {
+      "main": [
+        [
+          {
+            "node": "Handle Missing Phone",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Missing Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Missing Both",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle SMS Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Email Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle AppFolio Task Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle AppFolio Note Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Dashboard Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle AI Classification Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Vendor Notification Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Vendor Assignment Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Vendor Timeout",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle SLA Escalation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Unknown Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Missing Phone": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Severity Level": {
+      "main": [
+        [
+          {
+            "node": "Send Internal Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Alert (Low/Medium)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Missing Email": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Missing Both": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle SMS Failed": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Email Failed": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle AppFolio Task Failed": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle AppFolio Note Failed": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Dashboard Failed": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle AI Classification Failed": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Vendor Notification Failed": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Vendor Assignment Failed": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Vendor Timeout": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle SLA Escalation Failed": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Unknown Error": {
+      "main": [
+        [
+          {
+            "node": "Check Severity Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Internal Alert": {
+      "main": [
+        [
+          {
+            "node": "Update Error Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Alert (Low/Medium)": {
+      "main": [
+        [
+          {
+            "node": "Update Error Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Error Key": {
+      "main": [
+        [
+          {
+            "node": "Check Error Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Error Log": {
+      "main": [
+        [
+          {
+            "node": "Check If Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Suppress Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Failure Counter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suppress Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Send to Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Failure Counter": {
+      "main": [
+        [
+          {
+            "node": "Check Escalation Threshold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Escalation Threshold": {
+      "main": [
+        [
+          {
+            "node": "Escalate Severity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate Severity": {
+      "main": [
+        [
+          {
+            "node": "Classify Error Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Error Log": {
+      "main": [
+        [
+          {
+            "node": "Send to Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

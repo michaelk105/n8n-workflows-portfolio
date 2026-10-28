@@ -1,0 +1,740 @@
+{
+  "name": "04 - Vendor Assignment",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "work_order_id"
+            },
+            {
+              "name": "task_id"
+            },
+            {
+              "name": "tenant_name"
+            },
+            {
+              "name": "property_name"
+            },
+            {
+              "name": "unit_number"
+            },
+            {
+              "name": "work_order_description"
+            },
+            {
+              "name": "urgency"
+            },
+            {
+              "name": "SLA_deadline"
+            },
+            {
+              "name": "issue_category"
+            },
+            {
+              "name": "appfolio_record_url"
+            }
+          ]
+        }
+      },
+      "id": "cfd6f3dd-47b4-4de7-9b50-65f4f74af4c6",
+      "name": "Receive Work Order Data",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vendor assignment logic based on issue category, property, urgency, and availability\nconst item = $input.first();\n\n// Vendor database (in production, this would be fetched from a database)\nconst vendors = {\n  'Plumbing': { name: 'ABC Plumbing', contact: 'vendor@abcplumbing.com', phone: '+1-555-0100' },\n  'Electrical': { name: 'XYZ Electric', contact: 'vendor@xyzelectric.com', phone: '+1-555-0200' },\n  'HVAC': { name: 'Cool Air HVAC', contact: 'vendor@coolairhvac.com', phone: '+1-555-0300' },\n  'Appliance': { name: 'Fix-It Appliances', contact: 'vendor@fixitappliances.com', phone: '+1-555-0400' }\n};\n\nconst issueCategory = item.json.issue_category || 'General';\nconst vendor = vendors[issueCategory];\n\nif (vendor) {\n  return [{\n    json: {\n      ...item.json,\n      vendor_name: vendor.name,\n      vendor_contact: vendor.contact,\n      vendor_phone: vendor.phone,\n      vendor_found: true\n    }\n  }];\n} else {\n  return [{\n    json: {\n      ...item.json,\n      vendor_found: false,\n      status: 'Vendor assignment needed'\n    }\n  }];\n}"
+      },
+      "id": "b4e9d70f-c2d8-4f59-9aa1-c6055666edcc",
+      "name": "Determine Vendor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.vendor_found }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e001b350-fa4a-4635-9392-6b2a5ef6607b",
+      "name": "Check Vendor Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        688,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "={{ $json.vendor_contact }}",
+        "subject": "=New {{ $json.urgency }} Maintenance Request - Work Order {{ $json.work_order_id }}",
+        "message": "=New {{ $json.urgency }} maintenance request assigned.\n\nWork Order: {{ $json.work_order_id }}\nProperty/Unit: {{ $json.property_name }} {{ $json.unit_number }}\nIssue: {{ $json.work_order_description }}\n\nPlease confirm acceptance.",
+        "approvalOptions": {
+          "values": {
+            "approveLabel": "Accept Work Order"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 10,
+              "resumeUnit": "minutes"
+            }
+          },
+          "appendAttribution": true
+        }
+      },
+      "id": "cc4d830f-3eaa-47e5-8d00-c6c9a98c4cf6",
+      "name": "Notify Vendor",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        912,
+        432
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "vendor_acceptance_status",
+              "value": "No response",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "escalation_status",
+              "value": "Vendor no-response escalation",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "event_type",
+              "value": "vendor_no_response",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "651568d4-f993-4dea-9664-65181dd64414",
+      "name": "Vendor No Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=⚠️ Vendor No Response Alert\n\nWork Order: {{ $json.work_order_id }}\nVendor: {{ $json.vendor_name }}\nProperty/Unit: {{ $json.property_name }} {{ $json.unit_number }}\nUrgency: {{ $json.urgency }}\nIssue: {{ $json.work_order_description }}\n\nThe vendor has not responded within the expected timeframe. Please assign a new vendor.",
+        "otherOptions": {}
+      },
+      "id": "f57bb197-3442-4210-9868-0e18cf7600fc",
+      "name": "Notify Maintenance Coordinator",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1584,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.urgency }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "Emergency"
+            },
+            {
+              "leftValue": "={{ $json.urgency }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "Urgent"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5f50a3d3-378c-407f-a157-f3e5cbf2cf5f",
+      "name": "Check if Emergency or Urgent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1808,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__property.manager@example.com__>",
+        "subject": "=URGENT: Vendor No Response - Work Order {{ $json.work_order_id }}",
+        "message": "=URGENT: Vendor No Response\n\nWork Order: {{ $json.work_order_id }}\nVendor: {{ $json.vendor_name }}\nProperty/Unit: {{ $json.property_name }} {{ $json.unit_number }}\nUrgency: {{ $json.urgency }}\nIssue: {{ $json.work_order_description }}\n\nThe vendor has not responded within the expected timeframe for this {{ $json.urgency }} work order. Immediate action required.",
+        "options": {}
+      },
+      "id": "2790e4c7-f088-4110-948b-f989505c60cd",
+      "name": "Notify Property Manager",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2032,
+        432
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "03A - Escalation Engine"
+        },
+        "options": {}
+      },
+      "id": "0001ed07-afcc-49db-a22d-b610249ccd9a",
+      "name": "Send to Escalation Engine",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2032,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "07 - Audit Logger"
+        },
+        "options": {}
+      },
+      "id": "f84280a8-bd9b-48b1-a87a-63c34b7b9f41",
+      "name": "Log No Response to Audit",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2480,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.vendor_contact }}",
+        "subject": "=RETRY: New {{ $json.urgency }} Maintenance Request - Work Order {{ $json.work_order_id }}",
+        "message": "=New {{ $json.urgency }} maintenance request assigned.\n\nWork Order: {{ $json.work_order_id }}\nProperty/Unit: {{ $json.property_name }} {{ $json.unit_number }}\nIssue: {{ $json.work_order_description }}\n\nPlease confirm acceptance by replying to this email or clicking the link below.\n\nAccept Work Order: {{ $execution.resumeUrl }}",
+        "options": {}
+      },
+      "id": "5b360270-a351-400c-82f0-8e38403980b3",
+      "name": "Retry Vendor Notification",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        112
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=🚨 Vendor Notification Failed\n\nWork Order: {{ $json.work_order_id }}\nVendor: {{ $json.vendor_name }}\nContact: {{ $json.vendor_contact }}\nProperty/Unit: {{ $json.property_name }} {{ $json.unit_number }}\nUrgency: {{ $json.urgency }}\n\nFailed to notify vendor after retry. Please contact vendor manually.",
+        "otherOptions": {}
+      },
+      "id": "7668a1aa-9763-4694-981b-43b8f032ce54",
+      "name": "Notify Coordinator - Error",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        464,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "08 - Error Handler"
+        },
+        "options": {}
+      },
+      "id": "f1fb9670-4f5d-415c-a4a6-a4e18ea2e156",
+      "name": "Send to Error Handler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        688,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "07 - Audit Logger"
+        },
+        "options": {}
+      },
+      "id": "eef3e436-8cc4-400b-a265-6399e1b5b994",
+      "name": "Log Error to Audit",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        912,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "text": "=⚠️ Vendor Assignment Needed\n\nWork Order: {{ $json.work_order_id }}\nProperty/Unit: {{ $json.property_name }} {{ $json.unit_number }}\nIssue Category: {{ $json.issue_category }}\nUrgency: {{ $json.urgency }}\nIssue: {{ $json.work_order_description }}\n\nNo matching vendor found. Please manually assign a vendor.",
+        "otherOptions": {}
+      },
+      "id": "f6df17fd-6f57-4dca-9891-44d945862587",
+      "name": "Notify Coordinator - No Vendor",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        912,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "07 - Audit Logger"
+        },
+        "options": {}
+      },
+      "id": "06d37f77-773a-439f-bec4-6ee22c426bd9",
+      "name": "Log No Vendor to Audit",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1136,
+        624
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "ef7cedb8-419e-444f-a6dc-4f466f0a2609",
+      "name": "Merge After PM Check",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2256,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.approved }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bcbbb772-d619-48c2-9ca2-ecf792bf0064",
+      "name": "Check Vendor Accepted",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1136,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "vendor_acceptance_status",
+              "value": "Accepted",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "vendor_assigned",
+              "value": "Yes",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "vendor_acceptance_timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "061a76b8-723b-4496-915b-d64a548f0b03",
+      "name": "Vendor Accepted",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "05 - Tenant Status Updates"
+        },
+        "options": {}
+      },
+      "id": "a8098163-b292-4911-a356-a52c4dd6af99",
+      "name": "Send to Tenant Status Updates",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1584,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "07 - Audit Logger"
+        },
+        "options": {}
+      },
+      "id": "8460090e-9215-46d4-b375-6e1e4b318e0f",
+      "name": "Log Vendor Acceptance",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1808,
+        336
+      ]
+    }
+  ],
+  "connections": {
+    "Receive Work Order Data": {
+      "main": [
+        [
+          {
+            "node": "Determine Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Vendor": {
+      "main": [
+        [
+          {
+            "node": "Check Vendor Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Vendor Found": {
+      "main": [
+        [
+          {
+            "node": "Notify Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Coordinator - No Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Vendor": {
+      "main": [
+        [
+          {
+            "node": "Check Vendor Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vendor No Response": {
+      "main": [
+        [
+          {
+            "node": "Notify Maintenance Coordinator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Maintenance Coordinator": {
+      "main": [
+        [
+          {
+            "node": "Check if Emergency or Urgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Emergency or Urgent": {
+      "main": [
+        [
+          {
+            "node": "Notify Property Manager",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send to Escalation Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Escalation Engine": {
+      "main": [
+        [
+          {
+            "node": "Merge After PM Check",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Retry Vendor Notification": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Notify Coordinator - Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Coordinator - Error": {
+      "main": [
+        [
+          {
+            "node": "Send to Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Log Error to Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Coordinator - No Vendor": {
+      "main": [
+        [
+          {
+            "node": "Log No Vendor to Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Property Manager": {
+      "main": [
+        [
+          {
+            "node": "Merge After PM Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge After PM Check": {
+      "main": [
+        [
+          {
+            "node": "Log No Response to Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Vendor Accepted": {
+      "main": [
+        [
+          {
+            "node": "Vendor Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Vendor No Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vendor Accepted": {
+      "main": [
+        [
+          {
+            "node": "Send to Tenant Status Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Tenant Status Updates": {
+      "main": [
+        [
+          {
+            "node": "Log Vendor Acceptance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

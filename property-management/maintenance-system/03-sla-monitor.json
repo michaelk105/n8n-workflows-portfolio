@@ -1,0 +1,435 @@
+{
+  "name": "03 - SLA Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "521bb2d0-c164-4146-aadf-4c95f5eab02c",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -96,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "current_status",
+              "condition": "notEqual",
+              "keyValue": "Completed"
+            },
+            {
+              "keyName": "current_status",
+              "condition": "notEqual",
+              "keyValue": "Closed"
+            },
+            {
+              "keyName": "SLA_deadline",
+              "condition": "isNotEmpty"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "a15bdeda-fb48-438e-acbd-a075aa73978f",
+      "name": "Get Open Work Orders",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "message",
+              "value": "SLA monitoring complete",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "92a6a629-6b2d-419e-b30e-857b26fb1509",
+      "name": "Loop Complete",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $now }}",
+              "rightValue": "={{ $json.SLA_deadline }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ed0aa639-ebd3-40dd-a0bf-b7453cad7e45",
+      "name": "Check SLA Overdue",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        576,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.escalation_status }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isEmpty"
+              }
+            },
+            {
+              "leftValue": "={{ $json.escalation_status }}",
+              "rightValue": "eligible",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "65f2ee50-377c-4b9d-ae35-dfdd38ee7350",
+      "name": "Check Escalation Status",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "work_order_id",
+              "value": "={{ $json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "urgency",
+              "value": "={{ $json.urgency }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "sla_deadline",
+              "value": "={{ $json.SLA_deadline }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "current_status",
+              "value": "={{ $json.current_status }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "escalation_reason",
+              "value": "SLA overdue",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f011d332-6917-4c59-9604-052c1a73abfd",
+      "name": "Prepare Escalation Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1024,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "83853010-bcf4-43d2-b307-bc961d8002a9",
+      "name": "Execute Escalation Engine",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1248,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "55629f53-3d64-4757-aa2d-daba854ada82",
+      "name": "Loop Through Work Orders",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        352,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "work_order_id",
+              "value": "={{ $json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "workflow_name",
+              "value": "03 - SLA Monitor",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "action_taken",
+              "value": "SLA overdue detected",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "result",
+              "value": "Escalation Engine triggered",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "next_step",
+              "value": "Escalation handled by 03A - Escalation Engine",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "858bf7de-e58c-4993-964a-7aac2aebbab0",
+      "name": "Prepare Audit Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1472,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "6fccf037-fe36-420b-8f35-7c6c3aa1ff34",
+      "name": "Execute Audit Logger",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1696,
+        176
+      ]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Open Work Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Open Work Orders": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Work Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check SLA Overdue": {
+      "main": [
+        [
+          {
+            "node": "Check Escalation Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Through Work Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Escalation Status": {
+      "main": [
+        [
+          {
+            "node": "Prepare Escalation Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Through Work Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Escalation Payload": {
+      "main": [
+        [
+          {
+            "node": "Execute Escalation Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Escalation Engine": {
+      "main": [
+        [
+          {
+            "node": "Prepare Audit Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Through Work Orders": {
+      "main": [
+        [
+          {
+            "node": "Loop Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check SLA Overdue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Audit Payload": {
+      "main": [
+        [
+          {
+            "node": "Execute Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Audit Logger": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Work Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

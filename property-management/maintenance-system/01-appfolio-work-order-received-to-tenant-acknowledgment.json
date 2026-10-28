@@ -1,0 +1,1318 @@
+{
+  "name": "01 - AppFolio Work Order Received → Tenant Acknowledgment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "appfolio-work-order",
+        "options": {
+          "noResponseBody": false,
+          "responseData": "={{ { \"status\": \"received\", \"work_order_id\": $json.body.work_order_id } }}"
+        }
+      },
+      "id": "d32c2a08-d70e-41cc-9750-6babe151fef0",
+      "name": "AppFolio Work Order Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1408,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "work_order_id",
+              "value": "={{ $json.body.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "tenant_id",
+              "value": "={{ $json.body.tenant_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "tenant_name",
+              "value": "={{ $json.body.tenant_name }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tenant_phone",
+              "value": "={{ $json.body.tenant_phone }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "tenant_email",
+              "value": "={{ $json.body.tenant_email }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "property_name",
+              "value": "={{ $json.body.property_name }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "unit_number",
+              "value": "={{ $json.body.unit_number }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "work_order_description",
+              "value": "={{ $json.body.work_order_description }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "submitted_timestamp",
+              "value": "={{ $json.body.submitted_timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "appfolio_record_url",
+              "value": "={{ $json.body.appfolio_record_url }}",
+              "type": "string"
+            },
+            {
+              "id": "11",
+              "name": "current_timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ef6862c3-5bcd-4238-aae8-4fefcb5b277b",
+      "name": "Extract Work Order Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1184,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "work_orders_dashboard"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "condition": "equal",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "b66c0099-108d-4e52-ad32-e282b5eef287",
+      "name": "Check Duplicate Work Order",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -960,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "35c5781d-2966-447f-ad20-9b13cac4376d",
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -736,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "log_message",
+              "value": "Duplicate work order webhook ignored",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "work_order_id",
+              "value": "={{ $('Extract Work Order Data').item.json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0ef8efbd-aa81-4ea7-b064-83e07e376cf6",
+      "name": "Log Duplicate",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -512,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "work_orders_dashboard"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "work_order_id": "={{ $('Extract Work Order Data').item.json.work_order_id }}",
+            "tenant_name": "={{ $('Extract Work Order Data').item.json.tenant_name }}",
+            "tenant_phone": "={{ $('Extract Work Order Data').item.json.tenant_phone }}",
+            "tenant_email": "={{ $('Extract Work Order Data').item.json.tenant_email }}",
+            "property_unit": "={{ $(\"Extract Work Order Data\").item.json.property_name + \" \" + $(\"Extract Work Order Data\").item.json.unit_number }}",
+            "issue_description": "={{ $('Extract Work Order Data').item.json.work_order_description }}",
+            "current_status": "Received",
+            "tenant_notified": "No",
+            "last_action_taken": "Work order received",
+            "submitted_timestamp": "={{ $('Extract Work Order Data').item.json.submitted_timestamp }}",
+            "communication_method_used": "",
+            "last_action_timestamp": "={{ $('Extract Work Order Data').item.json.current_timestamp }}"
+          },
+          "schema": [
+            {
+              "id": "work_order_id",
+              "displayName": "work_order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tenant_name",
+              "displayName": "tenant_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tenant_phone",
+              "displayName": "tenant_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tenant_email",
+              "displayName": "tenant_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "property_unit",
+              "displayName": "property_unit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "issue_description",
+              "displayName": "issue_description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "current_status",
+              "displayName": "current_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tenant_notified",
+              "displayName": "tenant_notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_action_taken",
+              "displayName": "last_action_taken",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_timestamp",
+              "displayName": "submitted_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "communication_method_used",
+              "displayName": "communication_method_used",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_action_timestamp",
+              "displayName": "last_action_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a2ebd3b0-b0a9-4d01-80e4-9cc43ca0596e",
+      "name": "Create Dashboard Record",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -512,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Extract Work Order Data').item.json.tenant_phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "leftValue": "={{ $('Extract Work Order Data').item.json.tenant_phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "301c5274-bfed-425e-8961-711da04dacdb",
+      "name": "Has Phone Number?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -288,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g. +15551234567)__>",
+        "to": "={{ $('Extract Work Order Data').item.json.tenant_phone }}",
+        "message": "=Hi {{ $(\"Extract Work Order Data\").item.json.tenant_name }}, our maintenance team has received your request for {{ $(\"Extract Work Order Data\").item.json.property_name }} {{ $(\"Extract Work Order Data\").item.json.unit_number }}. We will review it shortly and follow up with the next update. Work Order: {{ $(\"Extract Work Order Data\").item.json.work_order_id }}.",
+        "options": {}
+      },
+      "id": "89506248-023b-42c5-8979-da7990fe4cd4",
+      "name": "Send SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        160,
+        -224
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "id": "c428a23b-611e-4ed4-9540-4a3328580d08",
+      "name": "Merge Communication Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        384,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "sms_failed",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "2",
+              "name": "error_message",
+              "value": "={{ $json.error?.message ?? \"SMS delivery failed\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "65480c87-7b78-4ad5-bf19-66258f0ec808",
+      "name": "SMS Failed - Prepare Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -288,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Extract Work Order Data').item.json.tenant_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "leftValue": "={{ $('Extract Work Order Data').item.json.tenant_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0ccbfea4-46a4-4f50-a4f7-643ca4ba6925",
+      "name": "Has Email Address?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -64,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Extract Work Order Data').item.json.tenant_email }}",
+        "subject": "=Work Order Received - {{ $(\"Extract Work Order Data\").item.json.work_order_id }}",
+        "message": "=Hi {{ $(\"Extract Work Order Data\").item.json.tenant_name }},<br><br>Our maintenance team has received your request for {{ $(\"Extract Work Order Data\").item.json.property_name }} {{ $(\"Extract Work Order Data\").item.json.unit_number }}.<br><br>We will review it shortly and follow up with the next update.<br><br>Work Order: {{ $(\"Extract Work Order Data\").item.json.work_order_id }}<br><br>Thank you.",
+        "options": {}
+      },
+      "id": "619f921b-aabb-4958-a465-24593a1f59e5",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        -32
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "task_type",
+              "value": "missing_contact_info",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "task_description",
+              "value": "=Tenant contact info missing for work order {{ $(\"Extract Work Order Data\").item.json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "work_order_id",
+              "value": "={{ $('Extract Work Order Data').item.json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tenant_name",
+              "value": "={{ $('Extract Work Order Data').item.json.tenant_name }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "communication_method",
+              "value": "None - Missing Contact Info",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "error_logged",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9c0a95b2-c6dc-4761-8cde-e3b631af731c",
+      "name": "No Contact Info - Create Task",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        160,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "work_order_id",
+              "value": "={{ $('Extract Work Order Data').item.json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "tenant_notified",
+              "value": "={{ $json.communication_method ? \"Yes\" : \"No\" }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "communication_method_used",
+              "value": "={{ $json.communication_method ?? \"None\" }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "current_status",
+              "value": "={{ $json.communication_method ? \"Acknowledged\" : \"Received\" }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "last_action_taken",
+              "value": "={{ $json.communication_method ? \"Tenant acknowledgment sent via \" + $json.communication_method : \"Work order received - contact info missing\" }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "last_action_timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ea4b2f5c-e06b-47ef-a05a-92affa9b8552",
+      "name": "Prepare Dashboard Update",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        608,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "work_orders_dashboard"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "condition": "equal",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_notified": "={{ $json.tenant_notified }}",
+            "communication_method_used": "={{ $json.communication_method_used }}",
+            "current_status": "={{ $json.current_status }}",
+            "last_action_taken": "={{ $json.last_action_taken }}",
+            "last_action_timestamp": "={{ $json.last_action_timestamp }}"
+          },
+          "schema": [
+            {
+              "id": "tenant_notified",
+              "displayName": "tenant_notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "communication_method_used",
+              "displayName": "communication_method_used",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "current_status",
+              "displayName": "current_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_action_taken",
+              "displayName": "last_action_taken",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_action_timestamp",
+              "displayName": "last_action_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "170a6638-0936-4899-ba95-b4027474e778",
+      "name": "Update Dashboard",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $(\"Extract Work Order Data\").item.json.appfolio_record_url + \"/notes\" }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"note\": $now.toISO() + \" | Automation: Work Order Acknowledgment | Tenant acknowledgment sent via \" + $(\"Prepare Dashboard Update\").item.json.communication_method_used + \" | Work Order: \" + $(\"Extract Work Order Data\").item.json.work_order_id } }}",
+        "options": {}
+      },
+      "id": "d83aca5a-f130-477e-b223-0bfcf91e756d",
+      "name": "Log to AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1056,
+        -128
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "id": "29593855-53b5-4dc4-a3af-df59df978ff0",
+      "name": "Merge AppFolio Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1280,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "error_type",
+              "value": "appfolio_log_failed",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "work_order_id",
+              "value": "={{ $('Extract Work Order Data').item.json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "error_message",
+              "value": "={{ $json.error?.message ?? \"Failed to log to AppFolio after retry\" }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6191cadf-8a29-4e5f-b726-4917e2d6ca0d",
+      "name": "Log AppFolio Failure",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1056,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $(\"Extract Work Order Data\").item.json.appfolio_record_url + \"/notes\" }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"note\": $now.toISO() + \" | Automation: Work Order Acknowledgment | Tenant acknowledgment sent via \" + $(\"Prepare Dashboard Update\").item.json.communication_method_used + \" | Work Order: \" + $(\"Extract Work Order Data\").item.json.work_order_id } }}",
+        "options": {}
+      },
+      "id": "6fe4ca42-e27e-4cbd-a617-4ec0ac94aed4",
+      "name": "Retry AppFolio Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1056,
+        64
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "work_order_id",
+              "value": "={{ $('Extract Work Order Data').item.json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "tenant_id",
+              "value": "={{ $('Extract Work Order Data').item.json.tenant_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "tenant_name",
+              "value": "={{ $('Extract Work Order Data').item.json.tenant_name }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tenant_phone",
+              "value": "={{ $('Extract Work Order Data').item.json.tenant_phone }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "tenant_email",
+              "value": "={{ $('Extract Work Order Data').item.json.tenant_email }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "property_name",
+              "value": "={{ $('Extract Work Order Data').item.json.property_name }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "unit_number",
+              "value": "={{ $('Extract Work Order Data').item.json.unit_number }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "work_order_description",
+              "value": "={{ $('Extract Work Order Data').item.json.work_order_description }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "submitted_timestamp",
+              "value": "={{ $('Extract Work Order Data').item.json.submitted_timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "appfolio_record_url",
+              "value": "={{ $('Extract Work Order Data').item.json.appfolio_record_url }}",
+              "type": "string"
+            },
+            {
+              "id": "11",
+              "name": "current_status",
+              "value": "={{ $('Prepare Dashboard Update').item.json.current_status }}",
+              "type": "string"
+            },
+            {
+              "id": "12",
+              "name": "tenant_notified",
+              "value": "={{ $('Prepare Dashboard Update').item.json.tenant_notified }}",
+              "type": "string"
+            },
+            {
+              "id": "13",
+              "name": "communication_method_used",
+              "value": "={{ $('Prepare Dashboard Update').item.json.communication_method_used }}",
+              "type": "string"
+            },
+            {
+              "id": "14",
+              "name": "workflow_step",
+              "value": "01 - Tenant Acknowledgment Complete",
+              "type": "string"
+            },
+            {
+              "id": "15",
+              "name": "has_error",
+              "value": "={{ $json.error_type ? true : false }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2cc8b0a8-7976-4e56-8a76-620489e4b025",
+      "name": "Prepare Output Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1504,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Deduplication Check\nPrevents duplicate tenant notifications",
+        "height": 200,
+        "width": 600,
+        "color": 2
+      },
+      "id": "880688a9-0532-4068-b249-b516971e6d74",
+      "name": "Sticky Note caf2f5e3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -848,
+        -256
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Tenant Communication\nSMS → Email → Error Handling",
+        "height": 400,
+        "width": 900,
+        "color": 3
+      },
+      "id": "c9f2be2b-668d-4dda-9838-2817735cc512",
+      "name": "Sticky Note 594de6a5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        96,
+        -272
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## AppFolio Logging\nWith retry logic",
+        "height": 300,
+        "width": 300,
+        "color": 4
+      },
+      "id": "b3dae222-522c-4161-bfaa-eb1aae6e53e4",
+      "name": "Sticky Note 57fe8cf8",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3504,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b5a7bfa1-16ad-4a57-bc9d-1fb6c66ae54b",
+      "name": "Check For Errors",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1728,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "99eaa620-d1f7-42d9-86f3-6ed8d4ff833c",
+      "name": "Execute Error Handler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1952,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "e49c03c1-6481-49d1-9670-7195168eeb68",
+      "name": "Execute Urgency Classification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2176,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "3d5142f0-3694-4c33-8d0c-5fb040bd5dac",
+      "name": "Execute Audit Logger",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2400,
+        160
+      ]
+    }
+  ],
+  "connections": {
+    "AppFolio Work Order Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Work Order Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Work Order Data": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Work Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Work Order": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Log Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Dashboard Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Dashboard Record": {
+      "main": [
+        [
+          {
+            "node": "Has Phone Number?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Phone Number?": {
+      "main": [
+        [
+          {
+            "node": "Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has Email Address?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS": {
+      "main": [
+        [
+          {
+            "node": "Merge Communication Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Communication Results": {
+      "main": [
+        [
+          {
+            "node": "Prepare Dashboard Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMS Failed - Prepare Email": {
+      "main": [
+        [
+          {
+            "node": "Has Email Address?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email Address?": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Contact Info - Create Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Merge Communication Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "No Contact Info - Create Task": {
+      "main": [
+        [
+          {
+            "node": "Merge Communication Results",
+            "type": "main",
+            "index": 2
+          },
+          {
+            "node": "Merge Communication Results",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Prepare Dashboard Update": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Log to AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Merge AppFolio Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge AppFolio Results": {
+      "main": [
+        [
+          {
+            "node": "Prepare Output Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log AppFolio Failure": {
+      "main": [
+        [
+          {
+            "node": "Merge AppFolio Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Retry AppFolio Log": {
+      "main": [
+        [
+          {
+            "node": "Merge AppFolio Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Prepare Output Data": {
+      "main": [
+        [
+          {
+            "node": "Check For Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check For Errors": {
+      "main": [
+        [
+          {
+            "node": "Execute Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Urgency Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Execute Urgency Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Urgency Classification": {
+      "main": [
+        [
+          {
+            "node": "Execute Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

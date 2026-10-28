@@ -1,0 +1,861 @@
+{
+  "name": "06 - Completion Confirmation",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "work_order_id"
+            },
+            {
+              "name": "tenant_name"
+            },
+            {
+              "name": "tenant_phone"
+            },
+            {
+              "name": "tenant_email"
+            },
+            {
+              "name": "property_name"
+            },
+            {
+              "name": "unit_number"
+            },
+            {
+              "name": "status"
+            },
+            {
+              "name": "appfolio_record_url"
+            }
+          ]
+        }
+      },
+      "id": "cf0dd9f5-e55d-4e42-a069-90f856db5c79",
+      "name": "Receive Completed Work Order",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tenant_phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "eba3d3cc-6898-4283-8ede-5765a1b6c6ed",
+      "name": "Check Phone Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g. +15551234567)__>",
+        "to": "={{ $json.tenant_phone }}",
+        "message": "=Hi {{ $json.tenant_name }}, your maintenance request {{ $json.work_order_id }} has been marked complete. Was this resolved? Reply YES if resolved or NO if it still needs attention.",
+        "options": {}
+      },
+      "id": "5bed5fc9-c68c-4fb4-a45b-d2fc14dce5dc",
+      "name": "Send SMS Confirmation Request",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        688,
+        240
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "89f379d8-fa7f-4baf-a87d-de09a8aecd56",
+      "name": "Check SMS Failed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        912,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.tenant_email }}",
+        "subject": "=Maintenance Request {{ $json.work_order_id }} - Confirmation Needed",
+        "message": "=Hi {{ $json.tenant_name }},<br><br>Your maintenance request {{ $json.work_order_id }} has been marked complete.<br><br>Was this resolved?<br><br>Please reply to this email with:<br>- YES if the issue is resolved<br>- NO if it still needs attention<br><br>Thank you!",
+        "options": {}
+      },
+      "id": "3ed50981-fc95-4ff1-953b-df00861ee928",
+      "name": "Send Email Fallback",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1136,
+        160
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "41665cdf-6b2b-4ad8-a794-f0bfc54d652c",
+      "name": "Check Email Fallback Failed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1360,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ <__PLACEHOLDER_VALUE__Select \"08 - Error Handler\" workflow ID__> }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow_name": "06 - Completion Confirmation",
+            "error_type": "Communication failure",
+            "error_message": "Failed to send confirmation request to tenant",
+            "work_order_id": "={{ $json.work_order_id }}",
+            "tenant_name": "={{ $json.tenant_name }}",
+            "tenant_phone": "={{ $json.tenant_phone }}",
+            "tenant_email": "={{ $json.tenant_email }}",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "ccc667d3-b325-4dfa-8f0c-9e1f3a977964",
+      "name": "Send to Error Handler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1584,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ <__PLACEHOLDER_VALUE__Select \"07 - Audit Logger\" workflow ID__> }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "work_order_id": "={{ $('Send to Error Handler').item.json.work_order_id }}",
+            "action_taken": "Failed to send completion confirmation",
+            "result": "Both SMS and email failed",
+            "next_step": "Error sent to handler",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "e36bcf43-2743-4438-90a0-c9c5b657aa65",
+      "name": "Log Communication Error",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1808,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "df0dedf9-d483-44d6-b3b0-f34bc08b7c0a",
+      "name": "Merge Notification Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1584,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.tenant_email }}",
+        "subject": "=Maintenance Request {{ $json.work_order_id }} - Confirmation Needed",
+        "message": "=Hi {{ $json.tenant_name }},<br><br>Your maintenance request {{ $json.work_order_id }} has been marked complete.<br><br>Was this resolved?<br><br>Please reply to this email with:<br>- YES if the issue is resolved<br>- NO if it still needs attention<br><br>Thank you!",
+        "options": {}
+      },
+      "id": "55e7f9d9-1cc2-4382-91ee-1a2312a281af",
+      "name": "Send Email Confirmation Request",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        496
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resume": "form",
+        "formTitle": "=Maintenance Request {{ $json.work_order_id }} - Confirmation",
+        "formDescription": "Was your maintenance issue resolved?",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Was the issue resolved?",
+              "fieldType": "radio",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "YES"
+                  },
+                  {
+                    "option": "NO"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "limitWaitTime": true,
+        "resumeAmount": 24,
+        "options": {}
+      },
+      "id": "6c8489ee-3d07-40a7-bdc2-c4ae4b619f2f",
+      "name": "Wait for Tenant Response",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1808,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.response }}",
+              "rightValue": "YES",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5032a493-b4e4-454e-9c23-a2a0f02da076",
+      "name": "Check Tenant Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2032,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ <__PLACEHOLDER_VALUE__Select \"07 - Audit Logger\" workflow ID__> }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "work_order_id": "={{ $json.work_order_id }}",
+            "workflow_name": "06 - Completion Confirmation",
+            "action_taken": "Tenant confirmed work order resolved",
+            "result": "YES response received",
+            "next_step": "No further action needed",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "3658bf71-3c63-470e-a5e5-decd4bcb3c28",
+      "name": "Log Confirmation to Audit Logger",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2480,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.response }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0a575014-e33a-49fe-908d-e0dc9f6e3c1c",
+      "name": "Check No Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2256,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ <__PLACEHOLDER_VALUE__Select \"07 - Audit Logger\" workflow ID__> }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "work_order_id": "={{ $json.work_order_id }}",
+            "action_taken": "Completion confirmation expired",
+            "result": "No response after 24 hours",
+            "next_step": "No automatic reopen",
+            "completion_confirmation_status": "No tenant response",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "6f9b0f96-b47b-433e-9ef4-ec5cfe09ccb8",
+      "name": "Log No Response to Audit Logger",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2480,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint to reopen work order__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"status\": \"Reopened\", \"reason\": \"Tenant reported issue not resolved\" } }}",
+        "options": {}
+      },
+      "id": "4e71a3e7-dc6f-478b-85fb-0663391fb3af",
+      "name": "Reopen AppFolio Work Order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2480,
+        416
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint to create task__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"task_title\": \"Tenant reported completed work order was not resolved\", \"priority\": \"urgent\", \"assigned_to\": \"maintenance_coordinator\" } }}",
+        "options": {}
+      },
+      "id": "58765ec4-1f1f-4901-a1eb-694c86396a2c",
+      "name": "Create Urgent Follow-up Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2704,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Maintenance coordinator email__>",
+        "subject": "=URGENT: Work Order {{ $(\"Wait for Tenant Response\").item.json.work_order_id }} - Tenant Reports Not Resolved",
+        "message": "=Work Order: {{ $(\"Wait for Tenant Response\").item.json.work_order_id }}<br>Property: {{ $(\"Wait for Tenant Response\").item.json.property_name }}<br>Unit: {{ $(\"Wait for Tenant Response\").item.json.unit_number }}<br>Tenant: {{ $(\"Wait for Tenant Response\").item.json.tenant_name }}<br><br>The tenant has reported that this completed work order was NOT actually resolved.<br><br>Immediate follow-up required.",
+        "options": {}
+      },
+      "id": "18e1caed-2c5e-4f89-b3e3-0047b4589bc0",
+      "name": "Notify Maintenance Coordinator",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3152,
+        416
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ <__PLACEHOLDER_VALUE__Select \"07 - Audit Logger\" workflow ID__> }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "work_order_id": "={{ $(\"Wait for Tenant Response\").item.json.work_order_id }}",
+            "workflow_name": "06 - Completion Confirmation",
+            "action_taken": "Tenant reported issue not resolved",
+            "result": "NO response received",
+            "next_step": "Urgent follow-up required",
+            "escalation_status": "Reopened - tenant said not resolved",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "0ca6a226-3851-4174-a6e8-77f811c71962",
+      "name": "Log Escalation to Audit Logger",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3600,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "completion_confirmation_status",
+              "type": "string",
+              "value": "Tenant confirmed resolved"
+            },
+            {
+              "id": "2",
+              "name": "work_order_id",
+              "type": "string",
+              "value": "={{ $json.work_order_id }}"
+            },
+            {
+              "id": "3",
+              "name": "tenant_name",
+              "type": "string",
+              "value": "={{ $json.tenant_name }}"
+            },
+            {
+              "id": "4",
+              "name": "property_name",
+              "type": "string",
+              "value": "={{ $json.property_name }}"
+            },
+            {
+              "id": "5",
+              "name": "unit_number",
+              "type": "string",
+              "value": "={{ $json.unit_number }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "776f3351-0daa-49c9-9a67-ea0812b244a0",
+      "name": "Set Confirmation Status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2256,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "escalation_status",
+              "type": "string",
+              "value": "Reopened - tenant said not resolved"
+            },
+            {
+              "id": "2",
+              "name": "work_order_id",
+              "type": "string",
+              "value": "={{ $(\"Wait for Tenant Response\").item.json.work_order_id }}"
+            },
+            {
+              "id": "3",
+              "name": "tenant_name",
+              "type": "string",
+              "value": "={{ $(\"Wait for Tenant Response\").item.json.tenant_name }}"
+            },
+            {
+              "id": "4",
+              "name": "property_name",
+              "type": "string",
+              "value": "={{ $(\"Wait for Tenant Response\").item.json.property_name }}"
+            },
+            {
+              "id": "5",
+              "name": "unit_number",
+              "type": "string",
+              "value": "={{ $(\"Wait for Tenant Response\").item.json.unit_number }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0a76c293-36fd-4fda-920c-37a1b1441c69",
+      "name": "Set Escalation Status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2928,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Property manager email__>",
+        "subject": "=URGENT: Work Order {{ $(\"Wait for Tenant Response\").item.json.work_order_id }} - Tenant Reports Not Resolved",
+        "message": "=Work Order: {{ $(\"Wait for Tenant Response\").item.json.work_order_id }}<br>Property: {{ $(\"Wait for Tenant Response\").item.json.property_name }}<br>Unit: {{ $(\"Wait for Tenant Response\").item.json.unit_number }}<br>Tenant: {{ $(\"Wait for Tenant Response\").item.json.tenant_name }}<br><br>The tenant has reported that this completed work order was NOT actually resolved.<br><br>Immediate follow-up required.",
+        "options": {}
+      },
+      "id": "63fa5235-a8f0-440e-bc9d-32f00b3c9111",
+      "name": "Notify Property Manager",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3376,
+        416
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Completed Work Order": {
+      "main": [
+        [
+          {
+            "node": "Check Phone Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Phone Exists": {
+      "main": [
+        [
+          {
+            "node": "Send SMS Confirmation Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email Confirmation Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS Confirmation Request": {
+      "main": [
+        [
+          {
+            "node": "Check SMS Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check SMS Failed": {
+      "main": [
+        [
+          {
+            "node": "Send Email Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Notification Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Fallback": {
+      "main": [
+        [
+          {
+            "node": "Check Email Fallback Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email Fallback Failed": {
+      "main": [
+        [
+          {
+            "node": "Send to Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Notification Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send to Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Log Communication Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Notification Paths": {
+      "main": [
+        [
+          {
+            "node": "Wait for Tenant Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Tenant Response": {
+      "main": [
+        [
+          {
+            "node": "Check Tenant Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Tenant Response": {
+      "main": [
+        [
+          {
+            "node": "Set Confirmation Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check No Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check No Response": {
+      "main": [
+        [
+          {
+            "node": "Log No Response to Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reopen AppFolio Work Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reopen AppFolio Work Order": {
+      "main": [
+        [
+          {
+            "node": "Create Urgent Follow-up Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Urgent Follow-up Task": {
+      "main": [
+        [
+          {
+            "node": "Set Escalation Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Maintenance Coordinator": {
+      "main": [
+        [
+          {
+            "node": "Notify Property Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Confirmation Request": {
+      "main": [
+        [
+          {
+            "node": "Merge Notification Paths",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Set Confirmation Status": {
+      "main": [
+        [
+          {
+            "node": "Log Confirmation to Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Escalation Status": {
+      "main": [
+        [
+          {
+            "node": "Notify Maintenance Coordinator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Property Manager": {
+      "main": [
+        [
+          {
+            "node": "Log Escalation to Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

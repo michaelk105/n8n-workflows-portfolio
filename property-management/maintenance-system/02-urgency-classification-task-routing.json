@@ -1,0 +1,2228 @@
+{
+  "name": "02 - Urgency Classification + Task Routing",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "work_order_id"
+            },
+            {
+              "name": "tenant_id"
+            },
+            {
+              "name": "tenant_name"
+            },
+            {
+              "name": "tenant_phone"
+            },
+            {
+              "name": "tenant_email"
+            },
+            {
+              "name": "property_name"
+            },
+            {
+              "name": "unit_number"
+            },
+            {
+              "name": "work_order_description"
+            },
+            {
+              "name": "submitted_timestamp"
+            },
+            {
+              "name": "appfolio_record_url"
+            }
+          ]
+        }
+      },
+      "id": "be2e061f-f484-4c67-aa95-f4824166fb7c",
+      "name": "Receive Work Order from Workflow 01",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -448,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const description = $input.first().json.work_order_description.toLowerCase();\n\nconst emergencyKeywords = ['flood', 'active leak', 'gas leak', 'no heat', 'no ac extreme temperature', 'electrical hazard', 'fire', 'lockout', 'sewage backup', 'broken exterior door', 'no water'];\nconst urgentKeywords = ['plumbing issue', 'appliance not working', 'hvac issue', 'water heater', 'toilet not working', 'refrigerator', 'oven', 'washer', 'dryer'];\n\nlet urgency = 'Normal';\nlet classificationMethod = 'keyword-based';\nlet manualReviewRequired = false;\nlet classificationFailed = false;\n\ntry {\n  for (const keyword of emergencyKeywords) {\n    if (description.includes(keyword)) {\n      urgency = 'Emergency';\n      break;\n    }\n  }\n  \n  if (urgency === 'Normal') {\n    for (const keyword of urgentKeywords) {\n      if (description.includes(keyword)) {\n        urgency = 'Urgent';\n        break;\n      }\n    }\n  }\n} catch (error) {\n  urgency = 'Urgent';\n  manualReviewRequired = true;\n  classificationMethod = 'fallback-due-to-error';\n  classificationFailed = true;\n}\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    urgency,\n    classification_method: classificationMethod,\n    classification_confidence: urgency === 'Normal' ? 0.7 : 0.9,\n    manual_review_required: manualReviewRequired,\n    classification_failed: classificationFailed\n  }\n}];"
+      },
+      "id": "b526dd1c-4d38-4fa5-9458-a8338273a785",
+      "name": "Classify Urgency",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "urgency": "={{ $json.urgency }}",
+            "classification_method": "={{ $json.classification_method }}",
+            "classification_confidence": "={{ $json.classification_confidence }}",
+            "manual_review_required": "={{ $json.manual_review_required }}",
+            "current_status": "Urgency Classified",
+            "last_action_taken": "=Urgency classified as {{ $json.urgency }}",
+            "last_action_timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "563f0e43-1439-488b-80a2-28b0ca0c973b",
+      "name": "Update Dashboard",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst urgency = item.urgency;\nconst now = $now;\n\nlet slaDeadline;\nlet escalationStatus;\n\nif (urgency === 'Emergency') {\n  slaDeadline = now.plus({ minutes: 15 }).toISO();\n  escalationStatus = 'Emergency SLA active';\n} else if (urgency === 'Urgent') {\n  let deadline = now;\n  let hoursToAdd = 4;\n  \n  while (hoursToAdd > 0) {\n    deadline = deadline.plus({ hours: 1 });\n    const dayOfWeek = deadline.weekday;\n    const hour = deadline.hour;\n    \n    if (dayOfWeek >= 1 && dayOfWeek <= 5 && hour >= 9 && hour < 17) {\n      hoursToAdd--;\n    }\n  }\n  \n  slaDeadline = deadline.toISO();\n  escalationStatus = 'Urgent SLA active';\n} else {\n  let deadline = now;\n  let businessDaysToAdd = 1;\n  \n  while (businessDaysToAdd > 0) {\n    deadline = deadline.plus({ days: 1 });\n    const dayOfWeek = deadline.weekday;\n    \n    if (dayOfWeek >= 1 && dayOfWeek <= 5) {\n      businessDaysToAdd--;\n    }\n  }\n  \n  deadline = deadline.set({ hour: 17, minute: 0, second: 0 });\n  slaDeadline = deadline.toISO();\n  escalationStatus = 'Normal SLA active';\n}\n\nreturn [{\n  json: {\n    ...item,\n    sla_deadline: slaDeadline,\n    escalation_status: escalationStatus\n  }\n}];"
+      },
+      "id": "e3861fd7-1ae3-482b-98b4-fa591871fab3",
+      "name": "Calculate SLA Deadline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.urgency }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "Emergency"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.urgency }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "Urgent"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.urgency }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "Normal"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ccad9eaa-8f57-4a89-8fe1-37ce61c8d3be",
+      "name": "Route by Urgency",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for creating tasks__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"title\": \"Emergency maintenance follow-up required\", \"description\": \"Emergency work order: \" + $json.work_order_description, \"due_date\": $json.sla_deadline, \"priority\": \"emergency\" } }}",
+        "options": {}
+      },
+      "id": "800eea72-ff46-4346-b2cd-564384023f39",
+      "name": "Create Emergency Task in AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1792,
+        -160
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__maintenance.coordinator@example.com__>",
+        "subject": "=🚨 EMERGENCY: {{ $json.work_order_description }}",
+        "message": "=Emergency work order received:<br><br>Work Order ID: {{ $json.work_order_id }}<br>Property: {{ $json.property_name }}<br>Unit: {{ $json.unit_number }}<br>Tenant: {{ $json.tenant_name }}<br>Phone: {{ $json.tenant_phone }}<br>Description: {{ $json.work_order_description }}<br><br>SLA Deadline: {{ $json.sla_deadline }}<br>AppFolio Link: {{ $json.appfolio_record_url }}",
+        "options": {}
+      },
+      "id": "d9da2cdb-dfe1-4ef1-8e39-00debae4996b",
+      "name": "Notify Emergency Coordinator",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3584,
+        -160
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__backup.manager@example.com__>",
+        "subject": "=🚨 EMERGENCY: {{ $json.work_order_description }}",
+        "message": "=Emergency work order received:<br><br>Work Order ID: {{ $json.work_order_id }}<br>Property: {{ $json.property_name }}<br>Unit: {{ $json.unit_number }}<br>Tenant: {{ $json.tenant_name }}<br>Phone: {{ $json.tenant_phone }}<br>Description: {{ $json.work_order_description }}<br><br>SLA Deadline: {{ $json.sla_deadline }}<br>AppFolio Link: {{ $json.appfolio_record_url }}",
+        "options": {}
+      },
+      "id": "3d2e3adf-72cc-4a53-a704-d053c4af1f4f",
+      "name": "Notify Backup Manager",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        5376,
+        -160
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for adding notes__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"note\": \"Emergency maintenance request detected. Coordinator and backup manager notified. Follow-up task due in 15 minutes.\" } }}",
+        "options": {}
+      },
+      "id": "7e94dece-1fc7-49d9-9abe-23ed5e116ba8",
+      "name": "Add Emergency Note to AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5600,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for creating tasks__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"title\": \"Urgent maintenance follow-up required\", \"description\": \"Urgent work order: \" + $json.work_order_description, \"due_date\": $json.sla_deadline, \"priority\": \"urgent\" } }}",
+        "options": {}
+      },
+      "id": "b366fa89-bf6a-4418-8790-a604785ab929",
+      "name": "Create Urgent Task in AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3584,
+        224
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__maintenance.coordinator@example.com__>",
+        "subject": "=⚠️ URGENT: {{ $json.work_order_description }}",
+        "message": "=Urgent work order received:<br><br>Work Order ID: {{ $json.work_order_id }}<br>Property: {{ $json.property_name }}<br>Unit: {{ $json.unit_number }}<br>Tenant: {{ $json.tenant_name }}<br>Phone: {{ $json.tenant_phone }}<br>Description: {{ $json.work_order_description }}<br><br>SLA Deadline: {{ $json.sla_deadline }}<br>AppFolio Link: {{ $json.appfolio_record_url }}",
+        "options": {}
+      },
+      "id": "4238713c-65ea-4048-9482-f037f5972bc2",
+      "name": "Notify Urgent Coordinator",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        5376,
+        224
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for adding notes__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"note\": \"Urgent maintenance request detected. Coordinator notified. Follow-up task due in 4 business hours.\" } }}",
+        "options": {}
+      },
+      "id": "08e54444-6e20-4bd4-acd0-ba9c763c2535",
+      "name": "Add Urgent Note to AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5600,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for creating tasks__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"title\": \"Maintenance follow-up required\", \"description\": \"Work order: \" + $json.work_order_description, \"due_date\": $json.sla_deadline, \"priority\": \"normal\" } }}",
+        "options": {}
+      },
+      "id": "bf206011-6d40-43c8-b02e-81eea6d6a0d1",
+      "name": "Create Normal Task in AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3808,
+        656
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for adding notes__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"note\": \"Normal maintenance request detected. Follow-up task due in 1 business day.\" } }}",
+        "options": {}
+      },
+      "id": "ce8465d5-398c-4cfc-bf20-413cdf7559f9",
+      "name": "Add Normal Note to AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5600,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.classification_failed }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b60f99c5-10ad-48bb-87bc-83835dcd2259",
+      "name": "Check Classification Failed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        0,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__maintenance.coordinator@example.com__>",
+        "subject": "=⚠️ Classification Failed: Work Order {{ $json.work_order_id }}",
+        "message": "=Urgency classification failed for work order {{ $json.work_order_id }}. Defaulted to Urgent. Please review.<br><br>Work Order ID: {{ $json.work_order_id }}<br>Property: {{ $json.property_name }}<br>Unit: {{ $json.unit_number }}<br>Description: {{ $json.work_order_description }}",
+        "options": {}
+      },
+      "id": "4c9d2092-739f-4e52-aa57-d47fb2679aad",
+      "name": "Notify Classification Failure",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        144
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "errors": "Classification failed - defaulted to Urgent",
+            "manual_review_required": "Yes"
+          }
+        },
+        "options": {}
+      },
+      "id": "c7056caf-165a-4c39-8e64-a05fbb13de68",
+      "name": "Update Dashboard - Classification Error",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for adding notes__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"note\": \"Urgency classification failed. Defaulted to Urgent. Manual review required.\" } }}",
+        "options": {}
+      },
+      "id": "a83be8ef-4bdb-4d67-b1d9-14ddb4100bff",
+      "name": "Add Classification Failure Note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        144
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "2576bdb0-360f-42a9-aa1f-2f9111bdc04f",
+      "name": "Merge Classification Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        896,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.task_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "60aa81ba-ec3a-49da-8b08-326a2fb624fc",
+      "name": "Check Emergency Task Created",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2016,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "task_created",
+              "value": "Yes",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "53577aff-092b-41b5-9056-62c7f7dbfb25",
+      "name": "Set Emergency Task Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2688,
+        -64
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "77686e24-5fd5-4910-9117-c1ac789c3e99",
+      "name": "Merge Emergency Task Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3360,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for creating tasks__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"title\": \"Emergency maintenance follow-up required\", \"description\": \"Emergency work order: \" + $json.work_order_description, \"due_date\": $json.sla_deadline, \"priority\": \"emergency\" } }}",
+        "options": {}
+      },
+      "id": "ed603f83-979f-4972-855a-4df0fb69c997",
+      "name": "Retry Emergency Task Creation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2240,
+        -240
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.task_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bfd5bd8d-ac6c-4495-93a6-b69d56cdade2",
+      "name": "Check Emergency Retry Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2464,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__maintenance.coordinator@example.com, property.manager@example.com__>",
+        "subject": "=🚨 CRITICAL: AppFolio Task Creation Failed - {{ $json.work_order_id }}",
+        "message": "=AppFolio task creation failed for emergency work order {{ $json.work_order_id }}.<br><br>Work Order ID: {{ $json.work_order_id }}<br>Property: {{ $json.property_name }}<br>Unit: {{ $json.unit_number }}<br>Description: {{ $json.work_order_description }}<br><br>Please create task manually in AppFolio.",
+        "options": {}
+      },
+      "id": "a97bc9eb-0687-4905-a743-3eecfa84791a",
+      "name": "Notify Emergency Task Failure",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2688,
+        -288
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "task_created": "No",
+            "errors": "AppFolio task creation failed"
+          }
+        },
+        "options": {}
+      },
+      "id": "b53f8ac5-db1e-4da6-b08b-58992e0a0ecd",
+      "name": "Update Dashboard - Emergency Task Failed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2912,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "9eed5fc6-9d4a-4b3e-8d68-f09417e5d246",
+      "name": "Send Emergency Error to Handler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3136,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.task_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6cbc55ba-a927-41d0-ac4d-ec2463caf988",
+      "name": "Check Urgent Task Created",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3808,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "task_created",
+              "value": "Yes",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "8c6a811f-7adb-44db-9a19-1aa1e03cac93",
+      "name": "Set Urgent Task Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4480,
+        320
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "acbe225c-65d4-47a8-8122-ce2158e439b9",
+      "name": "Merge Urgent Task Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        5152,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for creating tasks__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"title\": \"Urgent maintenance follow-up required\", \"description\": \"Urgent work order: \" + $json.work_order_description, \"due_date\": $json.sla_deadline, \"priority\": \"urgent\" } }}",
+        "options": {}
+      },
+      "id": "ea83fbae-0dc1-48db-985b-0d980b4be458",
+      "name": "Retry Urgent Task Creation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4032,
+        144
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.task_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f5b44d3c-d2ad-4d24-a344-020b680bb5cb",
+      "name": "Check Urgent Retry Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4256,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__maintenance.coordinator@example.com, property.manager@example.com__>",
+        "subject": "=⚠️ CRITICAL: AppFolio Task Creation Failed - {{ $json.work_order_id }}",
+        "message": "=AppFolio task creation failed for urgent work order {{ $json.work_order_id }}.<br><br>Work Order ID: {{ $json.work_order_id }}<br>Property: {{ $json.property_name }}<br>Unit: {{ $json.unit_number }}<br>Description: {{ $json.work_order_description }}<br><br>Please create task manually in AppFolio.",
+        "options": {}
+      },
+      "id": "f8fe265a-3d86-4b18-ab24-ee7421971350",
+      "name": "Notify Urgent Task Failure",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        4480,
+        96
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "task_created": "No",
+            "errors": "AppFolio task creation failed"
+          }
+        },
+        "options": {}
+      },
+      "id": "b0033975-ff25-4a71-95bd-fb2b78734d93",
+      "name": "Update Dashboard - Urgent Task Failed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4704,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "4d1837e1-10ff-4068-a3ed-8580557da7e6",
+      "name": "Send Urgent Error to Handler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4928,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.task_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "032195fe-d5b5-4730-9038-dc7df22f9db1",
+      "name": "Check Normal Task Created",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4032,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "task_created",
+              "value": "Yes",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "01c4f5bf-5a55-4184-8a0b-8ff3b6ff025b",
+      "name": "Set Normal Task Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4704,
+        752
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "524bfc0a-92b1-4b47-952d-ce54cb87380e",
+      "name": "Merge Normal Task Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        5376,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for creating tasks__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"title\": \"Maintenance follow-up required\", \"description\": \"Work order: \" + $json.work_order_description, \"due_date\": $json.sla_deadline, \"priority\": \"normal\" } }}",
+        "options": {}
+      },
+      "id": "0eb07095-c7e5-4d63-9a89-610c2a8a1b5e",
+      "name": "Retry Normal Task Creation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4256,
+        576
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.task_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "036136de-348a-46cf-9330-c0a1ec2e9242",
+      "name": "Check Normal Retry Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4480,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__maintenance.coordinator@example.com, property.manager@example.com__>",
+        "subject": "=⚠️ CRITICAL: AppFolio Task Creation Failed - {{ $json.work_order_id }}",
+        "message": "=AppFolio task creation failed for work order {{ $json.work_order_id }}.<br><br>Work Order ID: {{ $json.work_order_id }}<br>Property: {{ $json.property_name }}<br>Unit: {{ $json.unit_number }}<br>Description: {{ $json.work_order_description }}<br><br>Please create task manually in AppFolio.",
+        "options": {}
+      },
+      "id": "e7622898-e5c1-4681-a100-04b0891fae54",
+      "name": "Notify Normal Task Failure",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        4704,
+        528
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "task_created": "No",
+            "errors": "AppFolio task creation failed"
+          }
+        },
+        "options": {}
+      },
+      "id": "0ae2097c-4635-4a6d-900f-3e3a9f0d1fca",
+      "name": "Update Dashboard - Normal Task Failed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4928,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "560c0fb5-2af7-4ed8-b3e1-5902df95f22d",
+      "name": "Send Normal Error to Handler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        5152,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.error_message }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e2ec192f-1381-4727-95d2-45bb9010a5a3",
+      "name": "Check Emergency Coordinator Notified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3808,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__maintenance.coordinator@example.com__>",
+        "subject": "=🚨 EMERGENCY: {{ $json.work_order_description }}",
+        "message": "=Emergency work order received:<br><br>Work Order ID: {{ $json.work_order_id }}<br>Property: {{ $json.property_name }}<br>Unit: {{ $json.unit_number }}<br>Tenant: {{ $json.tenant_name }}<br>Phone: {{ $json.tenant_phone }}<br>Description: {{ $json.work_order_description }}<br><br>SLA Deadline: {{ $json.sla_deadline }}<br>AppFolio Link: {{ $json.appfolio_record_url }}",
+        "options": {}
+      },
+      "id": "2e8551ff-585d-4eec-9727-c08e29fedd27",
+      "name": "Retry Emergency Coordinator Notification",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        4032,
+        -240
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "notification_error",
+              "value": "Emergency coordinator notification failed",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "1ec3f2f8-b750-4de8-8962-9a7fc8f9db35",
+      "name": "Handle Emergency Notification Failure",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4256,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "errors": "={{ $json.notification_error }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "f7b016bc-2606-4858-ac62-0e1dd634cb8f",
+      "name": "Update Dashboard - Emergency Notification Failed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4480,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API endpoint for adding notes__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"work_order_id\": $json.work_order_id, \"note\": \"Internal notification to emergency coordinator failed. Please verify coordinator was contacted.\" } }}",
+        "options": {}
+      },
+      "id": "2693b23f-e26b-4887-82dc-2eedee97f147",
+      "name": "Add Emergency Notification Failure Note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4704,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "aff76266-31fe-4d57-8770-4f7d46b02a1e",
+      "name": "Send Emergency Notification Error to Handler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4928,
+        -240
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "e4971eb3-2163-46c5-9007-1417ab3d5f13",
+      "name": "Merge Emergency Notification Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        5152,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "urgency": "={{ $json.urgency }}",
+            "task_id": "={{ $json.task_id }}",
+            "task_created": "={{ $json.task_created }}",
+            "sla_deadline": "={{ $json.sla_deadline }}",
+            "escalation_status": "={{ $json.escalation_status }}",
+            "current_status": "Open",
+            "last_action_taken": "Urgency routed and task created",
+            "last_action_timestamp": "={{ $now.toISO() }}",
+            "manual_review_required": "={{ $json.manual_review_required }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "93132492-49ff-443a-98b7-b20c65bee5a7",
+      "name": "Update Dashboard - Emergency Final",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5824,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "9310a5b1-8ed0-4704-98c6-aa31753fd13a",
+      "name": "Merge All Urgency Branches",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        6048,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "urgency": "={{ $json.urgency }}",
+            "task_id": "={{ $json.task_id }}",
+            "task_created": "={{ $json.task_created }}",
+            "sla_deadline": "={{ $json.sla_deadline }}",
+            "escalation_status": "={{ $json.escalation_status }}",
+            "current_status": "Open",
+            "last_action_taken": "Urgency routed and task created",
+            "last_action_timestamp": "={{ $now.toISO() }}",
+            "manual_review_required": "={{ $json.manual_review_required }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "96df45cc-67c0-46ff-a9c6-9f235732de7d",
+      "name": "Update Dashboard - Urgent Final",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5824,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "urgency": "={{ $json.urgency }}",
+            "task_id": "={{ $json.task_id }}",
+            "task_created": "={{ $json.task_created }}",
+            "sla_deadline": "={{ $json.sla_deadline }}",
+            "escalation_status": "={{ $json.escalation_status }}",
+            "current_status": "Open",
+            "last_action_taken": "Urgency routed and task created",
+            "last_action_timestamp": "={{ $now.toISO() }}",
+            "manual_review_required": "={{ $json.manual_review_required }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "5befd6f6-04ad-4150-88da-d2877f5bcfe2",
+      "name": "Update Dashboard - Normal Final",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5824,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "work_order_id",
+              "value": "={{ $json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "tenant_id",
+              "value": "={{ $json.tenant_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "tenant_name",
+              "value": "={{ $json.tenant_name }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "property_name",
+              "value": "={{ $json.property_name }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "unit_number",
+              "value": "={{ $json.unit_number }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "work_order_description",
+              "value": "={{ $json.work_order_description }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "urgency",
+              "value": "={{ $json.urgency }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "task_id",
+              "value": "={{ $json.task_id }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "sla_deadline",
+              "value": "={{ $json.sla_deadline }}",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "escalation_status",
+              "value": "={{ $json.escalation_status }}",
+              "type": "string"
+            },
+            {
+              "id": "11",
+              "name": "manual_review_required",
+              "value": "={{ $json.manual_review_required }}",
+              "type": "string"
+            },
+            {
+              "id": "12",
+              "name": "current_status",
+              "value": "={{ $json.current_status }}",
+              "type": "string"
+            },
+            {
+              "id": "13",
+              "name": "appfolio_record_url",
+              "value": "={{ $json.appfolio_record_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c0eaf761-0fd5-4e1c-8130-6986cbb992b2",
+      "name": "Prepare Output Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6272,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "363f64ab-dcb2-493f-a154-9b4010f8bf27",
+      "name": "Send to SLA Monitor",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        6496,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "37e838c6-383c-48b8-a491-d8a009aa3237",
+      "name": "Send to Vendor Assignment",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        6496,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "d642d35b-9d8d-4790-8f1d-eb2125468d27",
+      "name": "Send to Audit Logger",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        6496,
+        416
+      ]
+    }
+  ],
+  "connections": {
+    "Receive Work Order from Workflow 01": {
+      "main": [
+        [
+          {
+            "node": "Classify Urgency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Urgency": {
+      "main": [
+        [
+          {
+            "node": "Check Classification Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Calculate SLA Deadline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate SLA Deadline": {
+      "main": [
+        [
+          {
+            "node": "Route by Urgency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Urgency": {
+      "main": [
+        [
+          {
+            "node": "Create Emergency Task in AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Urgent Task in AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Normal Task in AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Emergency Task in AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Check Emergency Task Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Emergency Coordinator": {
+      "main": [
+        [
+          {
+            "node": "Check Emergency Coordinator Notified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Backup Manager": {
+      "main": [
+        [
+          {
+            "node": "Add Emergency Note to AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Urgent Task in AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Check Urgent Task Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Urgent Coordinator": {
+      "main": [
+        [
+          {
+            "node": "Add Urgent Note to AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Normal Task in AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Check Normal Task Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Classification Failed": {
+      "main": [
+        [
+          {
+            "node": "Notify Classification Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Classification Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Notify Classification Failure": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard - Classification Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard - Classification Error": {
+      "main": [
+        [
+          {
+            "node": "Add Classification Failure Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Classification Failure Note": {
+      "main": [
+        [
+          {
+            "node": "Merge Classification Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Classification Paths": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Emergency Task Created": {
+      "main": [
+        [
+          {
+            "node": "Set Emergency Task Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retry Emergency Task Creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Emergency Task Success": {
+      "main": [
+        [
+          {
+            "node": "Merge Emergency Task Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Emergency Task Paths": {
+      "main": [
+        [
+          {
+            "node": "Notify Emergency Coordinator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Emergency Task Creation": {
+      "main": [
+        [
+          {
+            "node": "Check Emergency Retry Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Emergency Retry Success": {
+      "main": [
+        [
+          {
+            "node": "Set Emergency Task Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Emergency Task Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Emergency Task Failure": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard - Emergency Task Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard - Emergency Task Failed": {
+      "main": [
+        [
+          {
+            "node": "Send Emergency Error to Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Emergency Error to Handler": {
+      "main": [
+        [
+          {
+            "node": "Merge Emergency Task Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Check Urgent Task Created": {
+      "main": [
+        [
+          {
+            "node": "Set Urgent Task Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retry Urgent Task Creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Urgent Task Success": {
+      "main": [
+        [
+          {
+            "node": "Merge Urgent Task Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Urgent Task Paths": {
+      "main": [
+        [
+          {
+            "node": "Notify Urgent Coordinator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Urgent Task Creation": {
+      "main": [
+        [
+          {
+            "node": "Check Urgent Retry Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Urgent Retry Success": {
+      "main": [
+        [
+          {
+            "node": "Set Urgent Task Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Urgent Task Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Urgent Task Failure": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard - Urgent Task Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard - Urgent Task Failed": {
+      "main": [
+        [
+          {
+            "node": "Send Urgent Error to Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Urgent Error to Handler": {
+      "main": [
+        [
+          {
+            "node": "Merge Urgent Task Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Check Normal Task Created": {
+      "main": [
+        [
+          {
+            "node": "Set Normal Task Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retry Normal Task Creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Normal Task Success": {
+      "main": [
+        [
+          {
+            "node": "Merge Normal Task Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Normal Task Paths": {
+      "main": [
+        [
+          {
+            "node": "Add Normal Note to AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Normal Task Creation": {
+      "main": [
+        [
+          {
+            "node": "Check Normal Retry Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Normal Retry Success": {
+      "main": [
+        [
+          {
+            "node": "Set Normal Task Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Normal Task Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Normal Task Failure": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard - Normal Task Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard - Normal Task Failed": {
+      "main": [
+        [
+          {
+            "node": "Send Normal Error to Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Normal Error to Handler": {
+      "main": [
+        [
+          {
+            "node": "Merge Normal Task Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Check Emergency Coordinator Notified": {
+      "main": [
+        [
+          {
+            "node": "Retry Emergency Coordinator Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Emergency Notification Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Retry Emergency Coordinator Notification": {
+      "main": [
+        [
+          {
+            "node": "Handle Emergency Notification Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Emergency Notification Failure": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard - Emergency Notification Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard - Emergency Notification Failed": {
+      "main": [
+        [
+          {
+            "node": "Add Emergency Notification Failure Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Emergency Notification Failure Note": {
+      "main": [
+        [
+          {
+            "node": "Send Emergency Notification Error to Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Emergency Notification Error to Handler": {
+      "main": [
+        [
+          {
+            "node": "Merge Emergency Notification Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Emergency Notification Paths": {
+      "main": [
+        [
+          {
+            "node": "Notify Backup Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Emergency Note to AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard - Emergency Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard - Emergency Final": {
+      "main": [
+        [
+          {
+            "node": "Merge All Urgency Branches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Urgency Branches": {
+      "main": [
+        [
+          {
+            "node": "Prepare Output Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Urgent Note to AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard - Urgent Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard - Urgent Final": {
+      "main": [
+        [
+          {
+            "node": "Merge All Urgency Branches",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Add Normal Note to AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Update Dashboard - Normal Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Dashboard - Normal Final": {
+      "main": [
+        [
+          {
+            "node": "Merge All Urgency Branches",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Prepare Output Data": {
+      "main": [
+        [
+          {
+            "node": "Send to SLA Monitor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send to Vendor Assignment",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send to Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

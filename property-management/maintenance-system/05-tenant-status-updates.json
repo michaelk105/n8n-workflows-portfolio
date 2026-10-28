@@ -1,0 +1,1113 @@
+{
+  "name": "05 - Tenant Status Updates",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "work_order_id"
+            },
+            {
+              "name": "tenant_name"
+            },
+            {
+              "name": "tenant_phone"
+            },
+            {
+              "name": "tenant_email"
+            },
+            {
+              "name": "property_name"
+            },
+            {
+              "name": "unit_number"
+            },
+            {
+              "name": "status"
+            },
+            {
+              "name": "vendor_name"
+            },
+            {
+              "name": "scheduled_date_time"
+            },
+            {
+              "name": "delay_reason"
+            },
+            {
+              "name": "message_type"
+            }
+          ]
+        }
+      },
+      "id": "9db02478-974d-45f5-a1b0-9571bc5de201",
+      "name": "Receive Status Update Data",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        688
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d728ac14-fa61-4823-a46a-25e8833ece03",
+      "name": "Combine Inputs",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        464,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<__PLACEHOLDER_VALUE__tenant-status-update__>",
+        "options": {}
+      },
+      "id": "5eebc2f0-7218-4808-a218-328bab3771f9",
+      "name": "AppFolio Status Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "Vendor Assigned",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Vendor Assigned"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "Scheduled",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Scheduled"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "In Progress",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "In Progress"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "Delayed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Delayed"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "Completed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Completed"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown Status"
+        }
+      },
+      "id": "04cf797c-9553-4a14-b404-1e4072003af6",
+      "name": "Determine Message Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        688,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "=<__PLACEHOLDER_VALUE__Select workflow: 06 - Completion Confirmation__>",
+        "options": {}
+      },
+      "id": "17596692-97a0-4a38-8dbd-7bcb5921d114",
+      "name": "Send to Completion Confirmation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        912,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "=<__PLACEHOLDER_VALUE__Select workflow: 08 - Error Handler__>",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "error_message": "={{ \"Unknown tenant status update type: \" + $json.status }}",
+            "workflow_name": "05 - Tenant Status Updates",
+            "work_order_id": "={{ $json.work_order_id }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "3e8539f3-bc27-4361-9f9c-403604f9b041",
+      "name": "Send Unknown Status to Error Handler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        912,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tenant_phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "leftValue": "={{ $json.tenant_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a42a654d-ff64-486b-9ca0-479277f89ffb",
+      "name": "Check Contact Info Available",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1360,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tenant_phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9ef25e46-ef87-4dc0-b16c-14b151582181",
+      "name": "Check Phone Available",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1584,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g. +15551234567)__>",
+        "to": "={{ $json.tenant_phone }}",
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "id": "c9711640-ffcc-4e05-b475-06f5566cbf36",
+      "name": "Send SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        208
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "id": "ba04b20e-f7d3-4900-842a-a77eca0a8834",
+      "name": "Merge Successful Sends",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2032,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "=<__PLACEHOLDER_VALUE__Select workflow: 08 - Error Handler__>",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "error_message": "={{ \"Both SMS and Email failed for work order: \" + $json.work_order_id }}",
+            "workflow_name": "05 - Tenant Status Updates",
+            "work_order_id": "={{ $json.work_order_id }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "695e633b-9f9c-4fff-a79b-fc3b63f6dabc",
+      "name": "Send Both Failed Error",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1808,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "sms_failed",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "2",
+              "name": "message",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "work_order_id",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tenant_name",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.tenant_name }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "tenant_phone",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.tenant_phone }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "tenant_email",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.tenant_email }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "status",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "36d0d307-b85d-4ed5-8805-128403132511",
+      "name": "Prepare Email Fallback",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tenant_phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7a42f2c6-f0c1-48da-8f99-4b046e246145",
+      "name": "Check Phone for Fallback",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1584,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g. +15551234567)__>",
+        "to": "={{ $json.tenant_phone }}",
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "id": "1e1f06f5-8a3b-4ea0-aa3b-979e45686288",
+      "name": "Send SMS (Fallback)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        784
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": "=<__PLACEHOLDER_VALUE__Select workflow: 08 - Error Handler__>",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "error_message": "={{ \"Both Email and SMS failed for work order: \" + $json.work_order_id }}",
+            "workflow_name": "05 - Tenant Status Updates",
+            "work_order_id": "={{ $json.work_order_id }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "f5f6b171-7ddb-4d94-8c94-ae2b79431462",
+      "name": "Send Email Failed Error",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1808,
+        1360
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "email_failed",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "2",
+              "name": "message",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "work_order_id",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tenant_name",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.tenant_name }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "tenant_phone",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.tenant_phone }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "tenant_email",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.tenant_email }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "status",
+              "value": "={{ $(\"Prepare Tenant Message\").item.json.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "56155e2a-bdff-47a9-8a0e-ac2bcec976b5",
+      "name": "Prepare SMS Fallback",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tenant_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "33a1c163-da4c-465b-a22a-c955857dd5ae",
+      "name": "Check Email for Fallback",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1584,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "<__PLACEHOLDER_VALUE__Your email address (e.g. maintenance@property.com)__>",
+        "toEmail": "={{ $json.tenant_email }}",
+        "subject": "=Work Order {{ $json.work_order_id }} - Status Update",
+        "emailFormat": "text",
+        "text": "={{ $json.message }}",
+        "options": {}
+      },
+      "id": "fb65b533-2694-426e-be45-efea8ed7edde",
+      "name": "Send Email (Fallback)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1808,
+        1168
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "<__PLACEHOLDER_VALUE__Your email address (e.g. maintenance@property.com)__>",
+        "toEmail": "={{ $json.tenant_email }}",
+        "subject": "=Work Order {{ $json.work_order_id }} - Status Update",
+        "emailFormat": "text",
+        "text": "={{ $json.message }}",
+        "options": {}
+      },
+      "id": "348015b5-64de-4751-b991-5a29f2989774",
+      "name": "Send Email (Primary)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1808,
+        400
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": "=<__PLACEHOLDER_VALUE__Select workflow: 08 - Error Handler__>",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "error_message": "={{ \"Missing tenant contact info for work order: \" + $json.work_order_id }}",
+            "workflow_name": "05 - Tenant Status Updates",
+            "work_order_id": "={{ $json.work_order_id }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "06772768-5c18-42e0-89f2-172caa1aa82d",
+      "name": "Send Missing Contact Error",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1584,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "=<__PLACEHOLDER_VALUE__Select workflow: 07 - Audit Logger__>",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "work_order_id": "={{ $('Send Missing Contact Error').item.json.work_order_id }}",
+            "workflow_name": "05 - Tenant Status Updates",
+            "action_taken": "Missing tenant contact info",
+            "result": "Cannot send status update - no phone or email",
+            "next_step": "Error sent to handler",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "699900ef-c325-4090-a7fb-0fc14056390c",
+      "name": "Log Missing Contact to Audit",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1808,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "communication_method_used",
+              "value": "={{ $json.sms_failed ? \"Email\" : ($json.email_failed ? \"SMS\" : ($json.tenant_phone ? \"SMS\" : \"Email\")) }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "work_order_id",
+              "value": "={{ $json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "96e25f9d-ddc9-40c4-ae6b-7dd26e9716fe",
+      "name": "Set Communication Method",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2256,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "=<__PLACEHOLDER_VALUE__Select workflow: 07 - Audit Logger__>",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "work_order_id": "={{ $json.work_order_id }}",
+            "workflow_name": "05 - Tenant Status Updates",
+            "action_taken": "Tenant status update sent",
+            "result": "={{ \"Status \" + $json.status + \" sent via \" + $json.communication_method_used }}",
+            "next_step": "Continue monitoring work order status",
+            "timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "5d9363b5-0fd3-44ce-8a4c-9823c67024a3",
+      "name": "Log to Audit Logger",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2480,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const status = $input.item.json.status;\nconst tenant_name = $input.item.json.tenant_name;\nconst work_order_id = $input.item.json.work_order_id;\nconst scheduled_date_time = $input.item.json.scheduled_date_time;\nconst delay_reason = $input.item.json.delay_reason;\nconst tenant_phone = $input.item.json.tenant_phone;\nconst tenant_email = $input.item.json.tenant_email;\nconst message_type = $input.item.json.message_type;\n\nlet message_template = '';\n\nif (status === 'Vendor Assigned') {\n  message_template = `Hi ${tenant_name}, your maintenance request ${work_order_id} has been assigned to our maintenance team/vendor. We'll keep you updated as it moves forward.`;\n} else if (status === 'Scheduled') {\n  message_template = `Hi ${tenant_name}, your maintenance request ${work_order_id} has been scheduled for ${scheduled_date_time}.`;\n} else if (status === 'In Progress') {\n  message_template = `Hi ${tenant_name}, your maintenance request ${work_order_id} is currently in progress.`;\n} else if (status === 'Delayed') {\n  message_template = `Hi ${tenant_name}, your maintenance request ${work_order_id} is still open. We are waiting on ${delay_reason} and will keep you updated.`;\n}\n\nreturn { \n  message_template,\n  work_order_id,\n  tenant_name,\n  tenant_phone,\n  tenant_email,\n  status,\n  message_type,\n  scheduled_date_time,\n  delay_reason\n};"
+      },
+      "id": "511ca632-f330-442b-864c-13433831a4b3",
+      "name": "Lookup Message Template",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "work_order_id",
+              "value": "={{ $json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "tenant_name",
+              "value": "={{ $json.tenant_name }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "tenant_phone",
+              "value": "={{ $json.tenant_phone }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tenant_email",
+              "value": "={{ $json.tenant_email }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "message_type",
+              "value": "={{ $json.message_type }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "final_message",
+              "value": "={{ $json.message_template }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "scheduled_date_time",
+              "value": "={{ $json.scheduled_date_time }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "delay_reason",
+              "value": "={{ $json.delay_reason }}",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "message",
+              "value": "={{ $json.message_template }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c49e463b-ed0f-47fe-b59d-fe1da8c8b80a",
+      "name": "Prepare Tenant Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1136,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Receive Status Update Data": {
+      "main": [
+        [
+          {
+            "node": "Combine Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Inputs": {
+      "main": [
+        [
+          {
+            "node": "Determine Message Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFolio Status Webhook": {
+      "main": [
+        [
+          {
+            "node": "Combine Inputs",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Determine Message Type": {
+      "main": [
+        [
+          {
+            "node": "Lookup Message Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup Message Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup Message Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup Message Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send to Completion Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unknown Status to Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Contact Info Available": {
+      "main": [
+        [
+          {
+            "node": "Check Phone Available",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Missing Contact Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Phone Available": {
+      "main": [
+        [
+          {
+            "node": "Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email (Primary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS": {
+      "main": [
+        [
+          {
+            "node": "Merge Successful Sends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Successful Sends": {
+      "main": [
+        [
+          {
+            "node": "Set Communication Method",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Fallback": {
+      "main": [
+        [
+          {
+            "node": "Check Phone for Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Phone for Fallback": {
+      "main": [
+        [
+          {
+            "node": "Send SMS (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Both Failed Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS (Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Merge Successful Sends",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Prepare SMS Fallback": {
+      "main": [
+        [
+          {
+            "node": "Check Email for Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email for Fallback": {
+      "main": [
+        [
+          {
+            "node": "Send Email (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email Failed Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Merge Successful Sends",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Send Email (Primary)": {
+      "main": [
+        [
+          {
+            "node": "Merge Successful Sends",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Send Missing Contact Error": {
+      "main": [
+        [
+          {
+            "node": "Log Missing Contact to Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Communication Method": {
+      "main": [
+        [
+          {
+            "node": "Log to Audit Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Message Template": {
+      "main": [
+        [
+          {
+            "node": "Prepare Tenant Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Tenant Message": {
+      "main": [
+        [
+          {
+            "node": "Check Contact Info Available",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

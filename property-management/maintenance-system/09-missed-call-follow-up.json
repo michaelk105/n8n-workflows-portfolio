@@ -1,0 +1,847 @@
+{
+  "name": "09 - Missed Call Follow-Up",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "missed-call",
+        "options": {}
+      },
+      "id": "65fff129-c6f3-4601-b31c-0b4042af46cf",
+      "name": "Missed Call Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL to search tenant by phone (e.g. https://api.appfolio.com/v1/tenants/search)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "phone",
+              "value": "={{ $json.body.caller_phone }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ad15b2a8-2b05-46f6-be77-b64a3d76fae3",
+      "name": "Lookup Tenant in AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tenant_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "06e5b6ca-4e79-47e1-9b8b-eea5a3d9a800",
+      "name": "Tenant Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        688,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL to search work orders (e.g. https://api.appfolio.com/v1/work-orders/search)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "tenant_id",
+              "value": "={{ $json.tenant_id }}"
+            },
+            {
+              "name": "status",
+              "value": "open"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fa0f1ac7-42c0-4251-84a9-f6e93f98c5a7",
+      "name": "Check for Open Work Orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        912,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.work_orders }}",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5f0d708a-0384-4ea1-9b51-7beb704f6953",
+      "name": "Open Work Order Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1136,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL to create task (e.g. https://api.appfolio.com/v1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"title\": \"Missed call follow-up required for open maintenance request\", \"description\": \"Tenant \" + $(\"Lookup Tenant in AppFolio\").item.json.tenant_name + \" (\" + $(\"Lookup Tenant in AppFolio\").item.json.unit_number + \") called at \" + $(\"Missed Call Webhook\").item.json.body.missed_call_timestamp + \". Open work order: \" + $json.work_orders[0].work_order_id, \"work_order_id\": $json.work_orders[0].work_order_id, \"tenant_id\": $(\"Lookup Tenant in AppFolio\").item.json.tenant_id, \"priority\": \"high\", \"type\": \"missed_call_follow_up\" } }}",
+        "options": {}
+      },
+      "id": "715c3270-4fa1-49ee-9b10-9beeecba3281",
+      "name": "Create Linked Follow-Up Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL to create task (e.g. https://api.appfolio.com/v1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"title\": \"Missed call follow-up required\", \"description\": \"Tenant \" + $(\"Lookup Tenant in AppFolio\").item.json.tenant_name + \" (\" + $(\"Lookup Tenant in AppFolio\").item.json.unit_number + \") called at \" + $(\"Missed Call Webhook\").item.json.body.missed_call_timestamp + \". No open work orders found.\", \"tenant_id\": $(\"Lookup Tenant in AppFolio\").item.json.tenant_id, \"priority\": \"normal\", \"type\": \"general_tenant_follow_up\" } }}",
+        "options": {}
+      },
+      "id": "c28588b8-0415-4a26-adbc-67c38db52317",
+      "name": "Create General Tenant Follow-Up Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL to create task (e.g. https://api.appfolio.com/v1/tasks)__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"title\": \"Missed call follow-up - Unknown caller\", \"description\": \"Missed call from \" + $(\"Missed Call Webhook\").item.json.body.caller_phone + \" at \" + $(\"Missed Call Webhook\").item.json.body.missed_call_timestamp, \"priority\": \"normal\", \"type\": \"general_follow_up\" } }}",
+        "options": {}
+      },
+      "id": "7b796824-a82d-4d70-8c93-a060713be7d1",
+      "name": "Create General Follow-Up Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        912,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Notification API URL (e.g. Slack webhook, email service)__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"message\": \"Missed call from unknown caller: \" + $(\"Missed Call Webhook\").item.json.body.caller_phone + \". Follow-up task created.\" } }}",
+        "options": {}
+      },
+      "id": "4c0a2154-d491-4cd7-9371-d6a3f0f1c262",
+      "name": "Notify Coordinator - Unknown Caller",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1136,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Workflow 07 - Audit Logger webhook URL__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"event_type\": \"missed_call_tenant_not_found\", \"caller_phone\": $(\"Missed Call Webhook\").item.json.body.caller_phone, \"timestamp\": $(\"Missed Call Webhook\").item.json.body.missed_call_timestamp, \"task_id\": $(\"Create General Follow-Up Task\").item.json.task_id } }}",
+        "options": {}
+      },
+      "id": "6cc4f354-81e3-45c5-a02e-0b8c8b6266f9",
+      "name": "Log to Audit Logger - Unknown Caller",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "from": "<__PLACEHOLDER_VALUE__Your Twilio phone number (e.g. +15559876543)__>",
+        "to": "={{ $(\"Lookup Tenant in AppFolio\").item.json.tenant_phone }}",
+        "message": "={{ \"Hi \" + $(\"Lookup Tenant in AppFolio\").item.json.tenant_name + \", sorry we missed your call. Our team has been notified and will follow up shortly.\" }}",
+        "options": {}
+      },
+      "id": "0f9512e6-34e0-4838-aa90-f27ffca0695c",
+      "name": "Send SMS to Tenant",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        496
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "sent"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bd8a41aa-22d8-486c-b718-e1b558bed8c1",
+      "name": "SMS Sent Successfully?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1808,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "deadline",
+              "name": "missed_call_follow_up_deadline",
+              "value": "={{ $now.plus({ hours: 2 }).toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "status",
+              "name": "current_status",
+              "value": "Missed call follow-up open",
+              "type": "string"
+            },
+            {
+              "id": "escalation",
+              "name": "escalation_status",
+              "value": "Missed call follow-up pending",
+              "type": "string"
+            },
+            {
+              "id": "tenant_id",
+              "name": "tenant_id",
+              "value": "={{ $(\"Lookup Tenant in AppFolio\").item.json.tenant_id }}",
+              "type": "string"
+            },
+            {
+              "id": "tenant_name",
+              "name": "tenant_name",
+              "value": "={{ $(\"Lookup Tenant in AppFolio\").item.json.tenant_name }}",
+              "type": "string"
+            },
+            {
+              "id": "task_id",
+              "name": "task_id",
+              "value": "={{ $(\"Create Linked Follow-Up Task\").item.json.task_id ?? $(\"Create General Tenant Follow-Up Task\").item.json.task_id }}",
+              "type": "string"
+            },
+            {
+              "id": "work_order_id",
+              "name": "work_order_id",
+              "value": "={{ $(\"Create Linked Follow-Up Task\").item.json.work_order_id ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "caller_phone",
+              "name": "caller_phone",
+              "value": "={{ $(\"Missed Call Webhook\").item.json.body.caller_phone }}",
+              "type": "string"
+            },
+            {
+              "id": "missed_call_timestamp",
+              "name": "missed_call_timestamp",
+              "value": "={{ $(\"Missed Call Webhook\").item.json.body.missed_call_timestamp }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "26684b9d-162e-46cb-8e4f-e0ad75f72d09",
+      "name": "Calculate Follow-Up Deadline",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2480,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $(\"Lookup Tenant in AppFolio\").item.json.tenant_email }}",
+        "subject": "We Missed Your Call",
+        "message": "={{ \"<p>Hi \" + $(\"Lookup Tenant in AppFolio\").item.json.tenant_name + \",</p><p>Sorry we missed your call. Our team has been notified and will follow up shortly.</p><p>Thank you,<br>Maintenance Team</p>\" }}",
+        "options": {}
+      },
+      "id": "f516a235-90ed-4463-ae7b-f2e88c6aa808",
+      "name": "Send Email to Tenant",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2032,
+        576
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5bdaa4a4-9d34-4d55-bade-452b49815d1b",
+      "name": "Email Sent Successfully?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2256,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Workflow 08 - Error Handler webhook URL__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"error_type\": \"tenant_communication_failed\", \"tenant_id\": $(\"Lookup Tenant in AppFolio\").item.json.tenant_id, \"tenant_name\": $(\"Lookup Tenant in AppFolio\").item.json.tenant_name, \"tenant_phone\": $(\"Lookup Tenant in AppFolio\").item.json.tenant_phone, \"tenant_email\": $(\"Lookup Tenant in AppFolio\").item.json.tenant_email, \"timestamp\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "93713cb0-625d-43d9-a226-c272f6d60b54",
+      "name": "Send to Error Handler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2480,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "missed_call_follow_ups"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $json.tenant_id }}",
+            "tenant_name": "={{ $json.tenant_name }}",
+            "task_id": "={{ $json.task_id }}",
+            "work_order_id": "={{ $json.work_order_id }}",
+            "caller_phone": "={{ $json.caller_phone }}",
+            "missed_call_timestamp": "={{ $json.missed_call_timestamp }}",
+            "follow_up_deadline": "={{ $json.missed_call_follow_up_deadline }}",
+            "current_status": "={{ $json.current_status }}",
+            "escalation_status": "={{ $json.escalation_status }}"
+          },
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tenant_name",
+              "displayName": "tenant_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "task_id",
+              "displayName": "task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "work_order_id",
+              "displayName": "work_order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_phone",
+              "displayName": "caller_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "missed_call_timestamp",
+              "displayName": "missed_call_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "follow_up_deadline",
+              "displayName": "follow_up_deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "current_status",
+              "displayName": "current_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "escalation_status",
+              "displayName": "escalation_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "84020cd9-115d-4be9-a0d8-7fe5cfcd85e0",
+      "name": "Save to Dashboard",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2704,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Workflow 07 - Audit Logger webhook URL__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"event_type\": \"missed_call_received\", \"caller_phone\": $(\"Missed Call Webhook\").item.json.body.caller_phone, \"timestamp\": $(\"Missed Call Webhook\").item.json.body.missed_call_timestamp, \"voicemail_transcript\": $(\"Missed Call Webhook\").item.json.body.voicemail_transcript } }}",
+        "options": {}
+      },
+      "id": "cc8eef42-a0a3-4935-bf92-d6b984b67b6c",
+      "name": "Log Missed Call Received",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2928,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Workflow 07 - Audit Logger webhook URL__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"event_type\": \"tenant_matched\", \"tenant_id\": $(\"Save to Dashboard\").item.json.tenant_id, \"tenant_name\": $(\"Save to Dashboard\").item.json.tenant_name, \"caller_phone\": $(\"Save to Dashboard\").item.json.caller_phone, \"timestamp\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "c6517cb9-f5e6-4683-bc97-e8f9eaf8cf9e",
+      "name": "Log Tenant Matched",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3152,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Workflow 07 - Audit Logger webhook URL__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"event_type\": \"follow_up_task_created\", \"task_id\": $(\"Save to Dashboard\").item.json.task_id, \"tenant_id\": $(\"Save to Dashboard\").item.json.tenant_id, \"work_order_id\": $(\"Save to Dashboard\").item.json.work_order_id, \"timestamp\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "3df03fc4-03e1-4e1b-9aec-3971f356f407",
+      "name": "Log Follow-Up Task Created",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3376,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__Workflow 07 - Audit Logger webhook URL__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"event_type\": \"tenant_missed_call_message_sent\", \"tenant_id\": $(\"Save to Dashboard\").item.json.tenant_id, \"communication_method\": \"sms\", \"timestamp\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "24c5597a-7b62-4160-a5ab-56b445530480",
+      "name": "Log Tenant Notified",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3600,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Missed Call Webhook": {
+      "main": [
+        [
+          {
+            "node": "Lookup Tenant in AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Tenant in AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Tenant Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tenant Found?": {
+      "main": [
+        [
+          {
+            "node": "Check for Open Work Orders",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create General Follow-Up Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Open Work Orders": {
+      "main": [
+        [
+          {
+            "node": "Open Work Order Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open Work Order Exists?": {
+      "main": [
+        [
+          {
+            "node": "Create Linked Follow-Up Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create General Tenant Follow-Up Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Linked Follow-Up Task": {
+      "main": [
+        [
+          {
+            "node": "Send SMS to Tenant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create General Tenant Follow-Up Task": {
+      "main": [
+        [
+          {
+            "node": "Send SMS to Tenant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create General Follow-Up Task": {
+      "main": [
+        [
+          {
+            "node": "Notify Coordinator - Unknown Caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Coordinator - Unknown Caller": {
+      "main": [
+        [
+          {
+            "node": "Log to Audit Logger - Unknown Caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS to Tenant": {
+      "main": [
+        [
+          {
+            "node": "SMS Sent Successfully?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMS Sent Successfully?": {
+      "main": [
+        [
+          {
+            "node": "Calculate Follow-Up Deadline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email to Tenant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Follow-Up Deadline": {
+      "main": [
+        [
+          {
+            "node": "Save to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email to Tenant": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Successfully?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Successfully?": {
+      "main": [
+        [
+          {
+            "node": "Calculate Follow-Up Deadline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send to Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Log Missed Call Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Missed Call Received": {
+      "main": [
+        [
+          {
+            "node": "Log Tenant Matched",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Tenant Matched": {
+      "main": [
+        [
+          {
+            "node": "Log Follow-Up Task Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Follow-Up Task Created": {
+      "main": [
+        [
+          {
+            "node": "Log Tenant Notified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

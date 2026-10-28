@@ -1,0 +1,972 @@
+{
+  "name": "07 - Audit Logger",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "work_order_id"
+            },
+            {
+              "name": "workflow_name"
+            },
+            {
+              "name": "action_taken"
+            },
+            {
+              "name": "result"
+            },
+            {
+              "name": "next_step"
+            },
+            {
+              "name": "timestamp"
+            },
+            {
+              "name": "urgency"
+            },
+            {
+              "name": "task_id"
+            },
+            {
+              "name": "tenant_name"
+            },
+            {
+              "name": "property_name"
+            },
+            {
+              "name": "unit_number"
+            },
+            {
+              "name": "escalation_status"
+            },
+            {
+              "name": "communication_method_used"
+            },
+            {
+              "name": "error_message"
+            }
+          ]
+        }
+      },
+      "id": "6f17d483-b53d-497b-a1c5-3462be817e33",
+      "name": "Receive Audit Event",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "audit_note",
+              "type": "string",
+              "value": "={{ $json.timestamp }} | Workflow: {{ $json.workflow_name }} | Action: {{ $json.action_taken }} | Result: {{ $json.result }} | Next Step: {{ $json.next_step }}"
+            },
+            {
+              "id": "2",
+              "name": "appfolio_note_status",
+              "type": "string",
+              "value": "Pending"
+            },
+            {
+              "id": "3",
+              "name": "retry_count",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "4",
+              "name": "audit_key",
+              "type": "string",
+              "value": "={{ $json.work_order_id }}_{{ $json.workflow_name }}_{{ $json.action_taken }}_{{ $json.timestamp }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "f7a4f6bc-878e-4ecb-973b-de875695b28c",
+      "name": "Format Audit Note",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        464,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL for adding notes (e.g., https://api.appfolio.com/v1/work_orders/{{work_order_id}}/notes)__>",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "<__PLACEHOLDER_VALUE__Select AppFolio credential type__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"note\": $json.audit_note, \"work_order_id\": $json.work_order_id } }}",
+        "options": {}
+      },
+      "id": "4848824c-f908-4c3b-a802-a55debde70ec",
+      "name": "Add Note to AppFolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1136,
+        496
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "40fe5148-bbfa-443e-89e0-b2777d5ce775",
+      "name": "Check AppFolio Note Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1360,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "appfolio_note_status",
+              "type": "string",
+              "value": "Success"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "e9e41d01-0607-4730-adb5-79b185fc9385",
+      "name": "Mark Note Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "4a78e01e-7fe7-45cf-b0ef-e467aeb38a66",
+      "name": "Find Dashboard Record",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2256,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__AppFolio API URL for adding notes (e.g., https://api.appfolio.com/v1/work_orders/{{work_order_id}}/notes)__>",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "<__PLACEHOLDER_VALUE__Select AppFolio credential type__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"note\": $json.audit_note, \"work_order_id\": $json.work_order_id } }}",
+        "options": {}
+      },
+      "id": "b161c89e-c082-4cab-9e4b-67b23aa2d1e0",
+      "name": "Retry AppFolio Note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1584,
+        592
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "31a142dc-0db0-49c0-83c7-30ab77939705",
+      "name": "Check Retry Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1808,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "appfolio_note_status",
+              "type": "string",
+              "value": "Success"
+            },
+            {
+              "id": "2",
+              "name": "retry_count",
+              "type": "number",
+              "value": 1
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "9c18a444-c48b-4cf3-9afb-5a1994c8486c",
+      "name": "Mark Retry Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "appfolio_note_status",
+              "type": "string",
+              "value": "Failed"
+            },
+            {
+              "id": "2",
+              "name": "retry_count",
+              "type": "number",
+              "value": 1
+            },
+            {
+              "id": "3",
+              "name": "error_message",
+              "type": "string",
+              "value": "AppFolio audit note failed."
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "7d8c1b62-ccfb-4351-a8f8-6ff38ad97f0d",
+      "name": "Mark Retry Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2032,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2f9ca847-9d51-48a9-a1db-ea1278b6f230",
+      "name": "Check Record Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2480,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "last_action_taken": "={{ $json.action_taken }}",
+            "last_action_timestamp": "={{ $json.timestamp }}",
+            "escalation_status": "={{ $json.escalation_status || \"\" }}",
+            "communication_method_used": "={{ $json.communication_method_used || \"\" }}",
+            "current_status": "={{ $json.result }}",
+            "errors": "={{ $json.error_message || \"\" }}",
+            "audit_key": "={{ $json.audit_key }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "fb6cff57-4247-43ef-af87-cc9e8abe3d3d",
+      "name": "Update Existing Record",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2704,
+        400
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "773051d4-8384-4dfa-b81a-0774ad082f9d",
+      "name": "Check Dashboard Update Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2928,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "work_order_id": "={{ $json.work_order_id }}",
+            "workflow_name": "={{ $json.workflow_name }}",
+            "last_action_taken": "={{ $json.action_taken }}",
+            "last_action_timestamp": "={{ $json.timestamp }}",
+            "urgency": "={{ $json.urgency || \"\" }}",
+            "task_id": "={{ $json.task_id || \"\" }}",
+            "tenant_name": "={{ $json.tenant_name || \"\" }}",
+            "property_name": "={{ $json.property_name || \"\" }}",
+            "unit_number": "={{ $json.unit_number || \"\" }}",
+            "escalation_status": "={{ $json.escalation_status || \"\" }}",
+            "communication_method_used": "={{ $json.communication_method_used || \"\" }}",
+            "current_status": "={{ $json.result }}",
+            "errors": "={{ $json.error_message || \"\" }}",
+            "audit_key": "={{ $json.audit_key }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "4fc21d36-fee2-4164-adc2-4dcf3abe3e7a",
+      "name": "Create New Record",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2704,
+        592
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "audit_logged": "Yes",
+            "appfolio_note_logged": "={{ $json.appfolio_note_status === \"Success\" ? \"Yes\" : \"No\" }}",
+            "dashboard_updated": "Yes"
+          }
+        },
+        "options": {}
+      },
+      "id": "c1921257-f643-4006-b36e-1d716596b4f8",
+      "name": "Log Audit Success",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3152,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "work_order_id": "={{ $json.work_order_id }}",
+            "workflow_name": "={{ $json.workflow_name }}",
+            "last_action_taken": "={{ $json.action_taken }}",
+            "last_action_timestamp": "={{ $json.timestamp }}",
+            "urgency": "={{ $json.urgency || \"\" }}",
+            "task_id": "={{ $json.task_id || \"\" }}",
+            "tenant_name": "={{ $json.tenant_name || \"\" }}",
+            "property_name": "={{ $json.property_name || \"\" }}",
+            "unit_number": "={{ $json.unit_number || \"\" }}",
+            "escalation_status": "={{ $json.escalation_status || \"\" }}",
+            "communication_method_used": "={{ $json.communication_method_used || \"\" }}",
+            "current_status": "={{ $json.result }}",
+            "errors": "={{ $json.error_message || \"\" }}",
+            "audit_key": "={{ $json.audit_key }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "70921bf5-f755-448d-a613-e47c6b903bdd",
+      "name": "Retry Dashboard Update",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3152,
+        592
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "40f201fe-ca8c-430f-94d5-78e950fc6d09",
+      "name": "Check Retry Dashboard Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3376,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "work_order_id",
+              "keyValue": "={{ $json.work_order_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "audit_logged": "Yes",
+            "appfolio_note_logged": "={{ $json.appfolio_note_status === \"Success\" ? \"Yes\" : \"No\" }}",
+            "dashboard_updated": "Yes"
+          }
+        },
+        "options": {}
+      },
+      "id": "85b906ad-f5e6-4758-84d6-286fc94bb21c",
+      "name": "Log Retry Success",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3600,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__URL to trigger 08 - Error Handler workflow__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"workflow_name\": \"07 - Audit Logger\", \"error_type\": \"Dashboard Update Failed\", \"work_order_id\": $json.work_order_id, \"original_payload\": $json, \"error_message\": \"Dashboard update failed after retry\" } }}",
+        "options": {}
+      },
+      "id": "8af063e7-f7d6-4e19-b75f-02730f6e3451",
+      "name": "Send to Error Handler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3600,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "audit_key",
+              "keyValue": "={{ $json.audit_key }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "d6eb80e0-253e-45a2-bad5-e59ca8d37441",
+      "name": "Check Duplicate Audit",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        688,
+        400
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "706e1eec-b12d-41c3-a5fa-7cbcf59c8810",
+      "name": "Check Audit Key Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        912,
+        400
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f3771f80-3082-4fac-a662-5832f7e18843",
+      "name": "Stop Duplicate Audit",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Receive Audit Event": {
+      "main": [
+        [
+          {
+            "node": "Format Audit Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Audit Note": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Note to AppFolio": {
+      "main": [
+        [
+          {
+            "node": "Check AppFolio Note Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check AppFolio Note Success": {
+      "main": [
+        [
+          {
+            "node": "Mark Note Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retry AppFolio Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Note Success": {
+      "main": [
+        [
+          {
+            "node": "Find Dashboard Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Dashboard Record": {
+      "main": [
+        [
+          {
+            "node": "Check Record Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry AppFolio Note": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Success": {
+      "main": [
+        [
+          {
+            "node": "Mark Retry Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Retry Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Retry Success": {
+      "main": [
+        [
+          {
+            "node": "Find Dashboard Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Retry Failed": {
+      "main": [
+        [
+          {
+            "node": "Find Dashboard Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Record Exists": {
+      "main": [
+        [
+          {
+            "node": "Update Existing Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create New Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Existing Record": {
+      "main": [
+        [
+          {
+            "node": "Check Dashboard Update Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Dashboard Update Success": {
+      "main": [
+        [
+          {
+            "node": "Log Audit Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retry Dashboard Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New Record": {
+      "main": [
+        [
+          {
+            "node": "Check Dashboard Update Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Dashboard Update": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Dashboard Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Dashboard Success": {
+      "main": [
+        [
+          {
+            "node": "Log Retry Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send to Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Audit": {
+      "main": [
+        [
+          {
+            "node": "Check Audit Key Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Audit Key Exists": {
+      "main": [
+        [
+          {
+            "node": "Stop Duplicate Audit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add Note to AppFolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

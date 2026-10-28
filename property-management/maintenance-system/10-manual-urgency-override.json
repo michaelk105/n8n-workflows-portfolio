@@ -1,0 +1,722 @@
+{
+  "name": "10 - Manual Urgency Override",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "urgency-override",
+        "options": {}
+      },
+      "id": "144bfcb0-062f-468d-84a3-f59490bb2a11",
+      "name": "Urgency Change Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.old_urgency === \"Normal\" && ($json.body.new_urgency === \"Urgent\" || $json.body.new_urgency === \"Emergency\") }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            },
+            {
+              "leftValue": "={{ $json.body.old_urgency === \"Urgent\" && ($json.body.new_urgency === \"Emergency\" || $json.body.new_urgency === \"Normal\") }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            },
+            {
+              "leftValue": "={{ $json.body.old_urgency === \"Emergency\" && ($json.body.new_urgency === \"Urgent\" || $json.body.new_urgency === \"Normal\") && $json.body.manager_approval === \"yes\" }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7854795f-a23d-4196-8356-0d542adcc9a2",
+      "name": "Validate Change",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { DateTime } = require(\"luxon\");\n\nconst item = $input.first();\nconst urgency = item.json.body.new_urgency;\nlet slaDeadline;\n\nif (urgency === \"Emergency\") {\n  slaDeadline = DateTime.now().plus({ minutes: 15 }).toISO();\n} else if (urgency === \"Urgent\") {\n  let deadline = DateTime.now();\n  let hoursAdded = 0;\n  while (hoursAdded < 4) {\n    deadline = deadline.plus({ hours: 1 });\n    const dayOfWeek = deadline.weekday;\n    const hour = deadline.hour;\n    if (dayOfWeek >= 1 && dayOfWeek <= 5 && hour >= 9 && hour < 17) {\n      hoursAdded++;\n    }\n  }\n  slaDeadline = deadline.toISO();\n} else {\n  let deadline = DateTime.now();\n  let daysAdded = 0;\n  while (daysAdded < 1) {\n    deadline = deadline.plus({ days: 1 });\n    const dayOfWeek = deadline.weekday;\n    if (dayOfWeek >= 1 && dayOfWeek <= 5) {\n      daysAdded++;\n    }\n  }\n  deadline = deadline.set({ hour: 17, minute: 0, second: 0 });\n  slaDeadline = deadline.toISO();\n}\n\nreturn [{\n  json: {\n    ...item.json.body,\n    sla_deadline: slaDeadline\n  }\n}];"
+      },
+      "id": "f416d246-90f8-4502-9ca0-5b59df8951dd",
+      "name": "Recalculate SLA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $json.appfolio_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"priority\": $json.new_urgency, \"sla_deadline\": $json.sla_deadline } }}",
+        "options": {}
+      },
+      "id": "b3a7bfcd-edce-4045-9543-94f95a856461",
+      "name": "Update AppFolio Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1136,
+        400
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.new_urgency }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "Emergency"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Emergency"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.new_urgency }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "Urgent"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Urgent"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "3e23c4ee-8317-49e7-a776-ae1f81d5eb37",
+      "name": "Route Notification",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "<__PLACEHOLDER_VALUE__emergency-alerts__>"
+        },
+        "text": "=🚨 *EMERGENCY WORK ORDER - Urgency Escalated*\n\n*Work Order:* {{ $json.work_order_id }}\n*Property:* {{ $json.property_name }} - Unit {{ $json.unit_number }}\n*Tenant:* {{ $json.tenant_name }}\n*Changed By:* {{ $json.changed_by }}\n*Previous Urgency:* {{ $json.old_urgency }}\n*New Urgency:* {{ $json.new_urgency }}\n*SLA Deadline:* {{ $json.sla_deadline }}\n*Status:* {{ $json.current_status }}\n\n<{{ $json.appfolio_url }}|View in AppFolio>",
+        "otherOptions": {}
+      },
+      "id": "c69e443b-5ddd-4785-8f09-5a54f5ecf4ce",
+      "name": "Notify Emergency Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1584,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__backup-manager@example.com__>",
+        "subject": "=EMERGENCY: Work Order {{ $('Notify Emergency Team').item.json.work_order_id }} Escalated",
+        "message": "=<h2>Emergency Work Order Escalated</h2>\n<p><strong>Work Order:</strong> {{ $('Notify Emergency Team').item.json.work_order_id }}</p>\n<p><strong>Property:</strong> {{ $('Notify Emergency Team').item.json.property_name }} - Unit {{ $('Notify Emergency Team').item.json.unit_number }}</p>\n<p><strong>Tenant:</strong> {{ $('Notify Emergency Team').item.json.tenant_name }}</p>\n<p><strong>Changed By:</strong> {{ $('Notify Emergency Team').item.json.changed_by }}</p>\n<p><strong>Previous Urgency:</strong> {{ $('Notify Emergency Team').item.json.old_urgency }}</p>\n<p><strong>New Urgency:</strong> {{ $('Notify Emergency Team').item.json.new_urgency }}</p>\n<p><strong>SLA Deadline:</strong> {{ $('Notify Emergency Team').item.json.sla_deadline }}</p>\n<p><strong>Status:</strong> {{ $('Notify Emergency Team').item.json.current_status }}</p>\n<p><a href=\"{{ $('Notify Emergency Team').item.json.appfolio_url }}\">View in AppFolio</a></p>",
+        "options": {}
+      },
+      "id": "555af339-097b-44e9-b084-fbbdb99fad62",
+      "name": "Notify Backup Manager",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1808,
+        400
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "<__PLACEHOLDER_VALUE__urgent-alerts__>"
+        },
+        "text": "=⚠️ *Urgent Work Order - Urgency Changed*\n\n*Work Order:* {{ $json.work_order_id }}\n*Property:* {{ $json.property_name }} - Unit {{ $json.unit_number }}\n*Tenant:* {{ $json.tenant_name }}\n*Changed By:* {{ $json.changed_by }}\n*Previous Urgency:* {{ $json.old_urgency }}\n*New Urgency:* {{ $json.new_urgency }}\n*SLA Deadline:* {{ $json.sla_deadline }}\n*Status:* {{ $json.current_status }}\n\n<{{ $json.appfolio_url }}|View in AppFolio>",
+        "otherOptions": {}
+      },
+      "id": "6c2bc9e8-a80b-4307-abaa-91e6a3902199",
+      "name": "Notify Coordinator",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1584,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "9d95a853-02ef-4249-8eb7-d481dffa8b27",
+      "name": "Send to Error Handler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1584,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "rejection_reason",
+              "value": "Emergency downgrade requires manager approval",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "work_order_id",
+              "value": "={{ $json.body.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "old_urgency",
+              "value": "={{ $json.body.old_urgency }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "new_urgency",
+              "value": "={{ $json.body.new_urgency }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "changed_by",
+              "value": "={{ $json.body.changed_by }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7931f7a8-3304-43b2-9dff-2ed672113844",
+      "name": "Reject Change",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        688,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "<__PLACEHOLDER_VALUE__manager-alerts__>"
+        },
+        "text": "=🚨 *Urgency Change Rejected*\n\n*Work Order:* {{ $json.work_order_id }}\n*Attempted Change:* {{ $json.old_urgency }} → {{ $json.new_urgency }}\n*Changed By:* {{ $json.changed_by }}\n*Reason:* {{ $json.rejection_reason }}\n\nManager approval is required to downgrade from Emergency.",
+        "otherOptions": {}
+      },
+      "id": "a78d83ab-3515-4a0f-b86c-a7bd964c4052",
+      "name": "Notify Manager",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        912,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "6b986b88-ac5c-4112-a28c-8526f34cddc3",
+      "name": "Log Rejection",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1136,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Route Notification').item.json.new_urgency }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "Emergency"
+            },
+            {
+              "leftValue": "={{ $('Route Notification').item.json.new_urgency }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "Urgent"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "770fcf80-9719-4cb2-8203-23df1922d347",
+      "name": "Check Vendor Reassignment",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1808,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "50b12461-d3fd-4f25-aac8-0794ab7ce24e",
+      "name": "Trigger Vendor Assignment",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2032,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "47f3ce62-1299-4a0a-a97e-42793f4b86ea",
+      "name": "Log to Audit",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2480,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "error_source",
+              "value": "10 - Manual Urgency Override",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "error_type",
+              "value": "AppFolio Update Failed",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "work_order_id",
+              "value": "={{ $json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "error_details",
+              "value": "={{ $json.error?.message ?? \"Unknown error\" }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8649238a-e27b-4d07-8c5b-a60c75ba5d54",
+      "name": "Prepare Error Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "<__PLACEHOLDER_VALUE__Central dashboard API URL (e.g., https://dashboard.example.com/api/work-orders/{work_order_id})__>",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"urgency\": $json.new_urgency, \"SLA_deadline\": $json.sla_deadline, \"escalation_status\": \"SLA recalculated after manual override\", \"manual_override\": \"Yes\", \"manual_override_by\": $json.changed_by, \"manual_override_timestamp\": $now.toISO(), \"last_action_taken\": \"Manual urgency override\", \"last_action_timestamp\": $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "ba93d6b3-82f7-4c9e-9d2d-3d00a95e15dc",
+      "name": "Update SLA Tracking Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        912,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "work_order_id",
+              "value": "={{ $('Check Vendor Reassignment').item.json.work_order_id }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "workflow_name",
+              "value": "10 - Manual Urgency Override",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "action_taken",
+              "value": "Manual urgency override completed",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "result",
+              "value": "=Urgency changed from {{ $('Check Vendor Reassignment').item.json.old_urgency }} to {{ $('Check Vendor Reassignment').item.json.new_urgency }}. SLA updated to {{ $('Check Vendor Reassignment').item.json.sla_deadline }}.",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "next_step",
+              "value": "Workflow 03 will monitor updated SLA deadline",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "345c33bc-8a0b-482e-9acc-133585f8b30c",
+      "name": "Prepare Audit Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2256,
+        672
+      ]
+    }
+  ],
+  "connections": {
+    "Urgency Change Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Change": {
+      "main": [
+        [
+          {
+            "node": "Recalculate SLA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recalculate SLA": {
+      "main": [
+        [
+          {
+            "node": "Update SLA Tracking Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update AppFolio Task": {
+      "main": [
+        [
+          {
+            "node": "Route Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Error Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Notification": {
+      "main": [
+        [
+          {
+            "node": "Notify Emergency Team",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Vendor Reassignment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Coordinator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Emergency Team": {
+      "main": [
+        [
+          {
+            "node": "Notify Backup Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject Change": {
+      "main": [
+        [
+          {
+            "node": "Notify Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Manager": {
+      "main": [
+        [
+          {
+            "node": "Log Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Vendor Reassignment": {
+      "main": [
+        [
+          {
+            "node": "Trigger Vendor Assignment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Audit Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Vendor Assignment": {
+      "main": [
+        [
+          {
+            "node": "Prepare Audit Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Error Data": {
+      "main": [
+        [
+          {
+            "node": "Send to Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update SLA Tracking Record": {
+      "main": [
+        [
+          {
+            "node": "Update AppFolio Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Audit Payload": {
+      "main": [
+        [
+          {
+            "node": "Log to Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Coordinator": {
+      "main": [
+        [
+          {
+            "node": "Check Vendor Reassignment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}
